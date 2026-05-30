@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Pool } from "pg";
-import { getOptionalEnv } from "./env";
+import { getDatabasePoolConfig } from "./database";
 import type { AppData, Activity, StravaTokenSet, TrainingContext } from "./types";
 
 const storePath = join(process.cwd(), ".data", "trainingtweaks.json");
@@ -15,18 +15,11 @@ function emptyData(): AppData {
   };
 }
 
-function getDatabaseUrl() {
-  return getOptionalEnv("DATABASE_URL")?.trim();
-}
-
 function getPool() {
-  const connectionString = getDatabaseUrl();
-  if (!connectionString) return undefined;
+  const config = getDatabasePoolConfig();
+  if (!config) return undefined;
 
-  pool ??= new Pool({
-    connectionString,
-    ssl: connectionString.includes("supabase.co") ? { rejectUnauthorized: false } : undefined
-  });
+  pool ??= new Pool(config);
   return pool;
 }
 

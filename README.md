@@ -66,6 +66,16 @@ For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Pos
 
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.
 
+If the connection URL is fussy, you can set separate Postgres variables instead. These take priority over `DATABASE_URL`:
+
+```bash
+POSTGRES_HOST=aws-1-us-west-2.pooler.supabase.com
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=postgres
+POSTGRES_USER=postgres.behomboexzgpjgdbaudk
+POSTGRES_PASSWORD=
+```
+
 Run the app:
 
 ```bash

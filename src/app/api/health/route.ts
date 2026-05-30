@@ -1,35 +1,33 @@
 import { NextResponse } from "next/server";
 import { Pool } from "pg";
+import { getDatabasePoolConfig, getDatabasePublicConfig } from "@/lib/database";
 import { getOptionalEnv } from "@/lib/env";
 import { getBaseUrl, getStravaRedirectUri } from "@/lib/strava";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const databaseUrl = getOptionalEnv("DATABASE_URL")?.trim();
+  const databaseConfig = getDatabasePoolConfig();
   const checks = {
     appBaseUrl: getBaseUrl(),
     stravaRedirectUri: getStravaRedirectUri(),
     hasStravaClientId: Boolean(getOptionalEnv("STRAVA_CLIENT_ID")),
     hasStravaClientSecret: Boolean(getOptionalEnv("STRAVA_CLIENT_SECRET")),
     hasOpenAiKey: Boolean(getOptionalEnv("OPENAI_API_KEY")),
-    hasDatabaseUrl: Boolean(databaseUrl),
-    database: await checkDatabase(databaseUrl)
+    hasDatabaseConfig: Boolean(databaseConfig),
+    databaseConfig: getDatabasePublicConfig(),
+    database: await checkDatabase(databaseConfig)
   };
 
   return NextResponse.json(checks);
 }
 
-async function checkDatabase(databaseUrl?: string) {
-  if (!databaseUrl) {
-    return { ok: false, message: "DATABASE_URL is not set." };
+async function checkDatabase(config?: ReturnType<typeof getDatabasePoolConfig>) {
+  if (!config) {
+    return { ok: false, message: "Database connection is not configured." };
   }
 
-  const pool = new Pool({
-    connectionString: databaseUrl,
-    ssl: databaseUrl.includes("supabase.co") ? { rejectUnauthorized: false } : undefined,
-    connectionTimeoutMillis: 5000
-  });
+  const pool = new Pool({ ...config, connectionTimeoutMillis: 5000 });
 
   try {
     await pool.query("select 1");
