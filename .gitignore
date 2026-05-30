@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+local.env
+.next
+node_modules
+.data
+.tools
+.pnpm.cjs
+.pnpm-latest.json
+.pnpm-debug.log
+tsconfig.tsbuildinfo
+dist
+coverage
+npm-debug.log*
