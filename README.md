@@ -47,7 +47,6 @@ Fill in:
 ```bash
 STRAVA_CLIENT_ID=
 STRAVA_CLIENT_SECRET=
-STRAVA_CALLBACK_DOMAIN=localhost
 NEXTAUTH_SECRET=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
@@ -77,12 +76,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Strava OAuth
 
-In the Strava API application settings, set the callback domain to match `STRAVA_CALLBACK_DOMAIN`.
+In the Strava API application settings, set the callback domain to the host portion of `APP_BASE_URL`.
 
 For local development:
 
 ```bash
-STRAVA_CALLBACK_DOMAIN=localhost
 APP_BASE_URL=http://localhost:3000
 ```
 
@@ -91,6 +89,20 @@ The app redirects to:
 ```text
 http://localhost:3000/api/strava/callback
 ```
+
+For Vercel production:
+
+```bash
+APP_BASE_URL=https://your-project.vercel.app
+```
+
+Then set the Strava callback domain to:
+
+```text
+your-project.vercel.app
+```
+
+If `APP_BASE_URL` is omitted, the app will try Vercel's system URL environment variables. For Strava, an explicit stable production `APP_BASE_URL` is still recommended because preview deployment URLs change.
 
 ## Routes
 

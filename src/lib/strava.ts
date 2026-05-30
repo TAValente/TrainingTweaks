@@ -27,10 +27,15 @@ export function getBaseUrl() {
   const appBaseUrl = getOptionalEnv("APP_BASE_URL");
   if (appBaseUrl) return appBaseUrl.replace(/\/$/, "");
 
-  const domain = getOptionalEnv("STRAVA_CALLBACK_DOMAIN", "localhost");
+  const vercelProductionUrl = getOptionalEnv("VERCEL_PROJECT_PRODUCTION_URL");
+  if (vercelProductionUrl) return normalizeUrl(vercelProductionUrl);
+
+  const vercelDeploymentUrl = getOptionalEnv("VERCEL_URL");
+  if (vercelDeploymentUrl) return normalizeUrl(vercelDeploymentUrl);
+
+  const domain = getOptionalEnv("STRAVA_CALLBACK_DOMAIN") || "localhost";
   if (domain === "localhost") return "http://localhost:3000";
-  if (domain?.startsWith("http")) return domain.replace(/\/$/, "");
-  return `https://${domain}`;
+  return normalizeUrl(domain);
 }
 
 export function getStravaRedirectUri() {
@@ -148,4 +153,10 @@ function normalizeStravaActivity(activity: StravaActivity): Activity {
 
 function optionalNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeUrl(value: string) {
+  const withoutTrailingSlash = value.replace(/\/$/, "");
+  if (withoutTrailingSlash.startsWith("http")) return withoutTrailingSlash;
+  return `https://${withoutTrailingSlash}`;
 }
