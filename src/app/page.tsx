@@ -62,7 +62,14 @@ export default function Home() {
 
   async function loadState() {
     const response = await fetch("/api/state", { cache: "no-store" });
-    const nextState = (await response.json()) as AppState;
+    const payload = await parseJsonResponse(response);
+    if (!response.ok) {
+      setError(payload.error ?? "Could not load app state.");
+      setStatus("App state failed to load.");
+      return;
+    }
+
+    const nextState = payload as AppState;
     setState(nextState);
     const nextPlanContext = nextState.context?.planContext ?? "";
     const nextGoalsContext = nextState.context?.goalsContext ?? "";
