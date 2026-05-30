@@ -8,6 +8,7 @@ export type DatabasePublicConfig = {
   database?: string;
   user?: string;
   hasPassword: boolean;
+  ignoredIncompleteParts?: boolean;
 };
 
 export function getDatabasePoolConfig(): PoolConfig | undefined {
@@ -36,7 +37,7 @@ export function getDatabasePublicConfig(): DatabasePublicConfig {
   const user = getOptionalEnv("POSTGRES_USER")?.trim();
   const password = getOptionalEnv("POSTGRES_PASSWORD")?.trim();
 
-  if (host || user || password) {
+  if (host && user && password) {
     return {
       source: "parts",
       host,
@@ -58,10 +59,11 @@ export function getDatabasePublicConfig(): DatabasePublicConfig {
       port: parsed.port || "5432",
       database: parsed.pathname.replace(/^\//, "") || "postgres",
       user: parsed.username,
-      hasPassword: Boolean(parsed.password)
+      hasPassword: Boolean(parsed.password),
+      ignoredIncompleteParts: Boolean(host || user || password)
     };
   } catch {
-    return { source: "url", hasPassword: false };
+    return { source: "url", hasPassword: false, ignoredIncompleteParts: Boolean(host || user || password) };
   }
 }
 

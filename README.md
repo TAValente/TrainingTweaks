@@ -62,7 +62,9 @@ This workspace also supports `local.env` for local-only secrets because the orig
 
 For local laptop use, leaving `DATABASE_URL` blank stores data in `.data/trainingtweaks.json`.
 
-For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write. You can also run [supabase/schema.sql](supabase/schema.sql) manually in the Supabase SQL editor.
+For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write.
+
+Schema changes are tracked in [supabase/migrations](supabase/migrations). The current migration creates the single JSON-backed app state table used by the MVP.
 
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.
 
