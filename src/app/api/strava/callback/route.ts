@@ -13,11 +13,39 @@ export async function GET(request: NextRequest) {
   }
 
   if (!code) {
-    return NextResponse.json({ error: "Missing Strava authorization code." }, { status: 400 });
+    return redirectWithStravaError(request, "Missing Strava authorization code.");
   }
 
-  const tokens = await exchangeCodeForTokens(code);
-  await saveStravaTokens(tokens);
+  try {
+    const tokens = await exchangeCodeForTokens(code);
+    await saveStravaTokens(tokens);
+  } catch (error) {
+    return redirectWithStravaError(request, stravaCallbackErrorMessage(error));
+  }
 
   return NextResponse.redirect(new URL("/?strava=connected", request.url));
+}
+
+function redirectWithStravaError(request: NextRequest, message: string) {
+  const url = new URL("/", request.url);
+  url.searchParams.set("strava", "error");
+  url.searchParams.set("reason", message);
+  return NextResponse.redirect(url);
+}
+
+function stravaCallbackErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Strava connection failed.";
+  if (message.includes("STRAVA_CLIENT_SECRET")) {
+    return "Missing STRAVA_CLIENT_SECRET in the deployed environment.";
+  }
+  if (message.includes("STRAVA_CLIENT_ID")) {
+    return "Missing STRAVA_CLIENT_ID in the deployed environment.";
+  }
+  if (message.includes("DATABASE_URL") || message.toLowerCase().includes("postgres")) {
+    return "Could not save Strava tokens. Check DATABASE_URL in the deployed environment.";
+  }
+  if (message.includes("Strava token exchange failed")) {
+    return "Strava token exchange failed. Check STRAVA_CLIENT_SECRET and the Strava callback domain.";
+  }
+  return "Strava connection failed. Check deployed environment variables and callback domain.";
 }

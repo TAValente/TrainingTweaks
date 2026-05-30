@@ -45,6 +45,18 @@ export default function Home() {
   const [isSavingContext, setIsSavingContext] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stravaStatus = params.get("strava");
+    const stravaReason = params.get("reason");
+    if (stravaStatus === "error") {
+      setError(stravaReason || "Strava connection failed.");
+      setStatus("Strava connection failed.");
+    } else if (stravaStatus === "denied") {
+      setError(stravaReason ? `Strava authorization denied: ${stravaReason}` : "Strava authorization denied.");
+      setStatus("Strava connection cancelled.");
+    } else if (stravaStatus === "connected") {
+      setStatus("Strava connected. Refresh activities next.");
+    }
     loadState();
   }, []);
 
