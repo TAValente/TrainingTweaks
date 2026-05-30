@@ -1,7 +1,11 @@
 .env
 .env.*
+.env*
 !.env.example
 local.env
+.env.local
+.env.vercel.local
+.vercel
 .next
 node_modules
 .data
@@ -13,3 +17,4 @@ tsconfig.tsbuildinfo
 dist
 coverage
 npm-debug.log*
+supabase/.temp
