@@ -90,7 +90,15 @@ You have access to recent and historical Strava-derived running data. Use whatev
 
 The user may select a named training plan family. Use the selected plan profile as helpful background, but the user's pasted plan details and recent training data are more important than generic plan knowledge.
 
-Plan knowledge guide:
+Use plan context in this priority order:
+1. The user's actual pasted plan/week details.
+2. The selected plan variant or level, if provided.
+3. The selected plan family's philosophy, stress pattern, and adaptation bias.
+4. General running adaptation principles.
+
+Do not assume a plan variant's exact workout schedule unless it is provided. Use plan-family knowledge to infer intent, not exact prescriptions.
+
+Selected plan guide:
 ${planKnowledgeGuide(trainingContext.planSource)}
 
 Available fields may include:

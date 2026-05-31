@@ -311,7 +311,7 @@ export default function Home() {
                 {trainingPlanProfiles.map((profile) => (
                   <option key={profile.id} value={profile.id}>
                     {profile.label}
-                    {profile.examples ? ` - ${profile.examples}` : ""}
+                    {profile.variants?.length ? ` - ${profile.variants.slice(0, 3).join(", ")}` : ""}
                   </option>
                 ))}
               </select>
