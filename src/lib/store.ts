@@ -118,7 +118,9 @@ export async function saveActivities(activities: Activity[]) {
     merged.set(`${activity.provider}:${activity.providerActivityId}`, activity);
   }
   for (const activity of activities) {
-    merged.set(`${activity.provider}:${activity.providerActivityId}`, activity);
+    const key = `${activity.provider}:${activity.providerActivityId}`;
+    const existing = merged.get(key);
+    merged.set(key, mergeActivity(existing, activity));
   }
 
   const sorted = Array.from(merged.values()).sort(
@@ -136,4 +138,18 @@ export async function saveActivities(activities: Activity[]) {
 export async function saveContext(context: TrainingContext) {
   const data = await readStore();
   await writeStore({ ...data, context });
+}
+
+function mergeActivity(existing: Activity | undefined, next: Activity): Activity {
+  if (!existing) return next;
+
+  return {
+    ...existing,
+    ...next,
+    bestEfforts: next.bestEfforts ?? existing.bestEfforts,
+    averageCadence: next.averageCadence ?? existing.averageCadence,
+    relativeEffort: next.relativeEffort ?? existing.relativeEffort,
+    averageHeartRate: next.averageHeartRate ?? existing.averageHeartRate,
+    maxHeartRate: next.maxHeartRate ?? existing.maxHeartRate
+  };
 }

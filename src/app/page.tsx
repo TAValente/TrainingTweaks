@@ -15,12 +15,24 @@ const emptySummary: ActivitySummary = {
   mileageLast7Days: 0,
   mileageLast14Days: 0,
   mileageLast28Days: 0,
+  mileageLast42Days: 0,
+  mileageLast84Days: 0,
+  mileageLast182Days: 0,
+  mileageLast730Days: 0,
+  mileageLast1825Days: 0,
   longestRunLast14DaysMiles: 0,
   longestRunLast28DaysMiles: 0,
+  longestRunLast182DaysMiles: 0,
+  longestRunLast730DaysMiles: 0,
+  longestRunLast1825DaysMiles: 0,
   recentIntensityIndicators: [],
   recentMissedDays: 0,
   runCountLast14Days: 0,
-  runCountLast28Days: 0
+  runCountLast28Days: 0,
+  runCountLast182Days: 0,
+  runCountLast730Days: 0,
+  runCountLast1825Days: 0,
+  fastestEfforts: []
 };
 
 export default function Home() {

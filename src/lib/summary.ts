@@ -1,4 +1,4 @@
-import type { Activity, ActivitySummary, TrainingContext } from "./types";
+import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
 
 const metersPerMile = 1609.344;
 
@@ -23,6 +23,11 @@ export function buildActivitySummary(activities: Activity[], now = new Date()): 
   const runs7 = windowRuns(7);
   const runs14 = windowRuns(14);
   const runs28 = windowRuns(28);
+  const runs42 = windowRuns(42);
+  const runs84 = windowRuns(84);
+  const runs182 = windowRuns(182);
+  const runs730 = windowRuns(730);
+  const runs1825 = windowRuns(1825);
 
   return {
     lastActivityDate: activities[0]?.startDate,
@@ -30,12 +35,27 @@ export function buildActivitySummary(activities: Activity[], now = new Date()): 
     mileageLast7Days: round1(sumMiles(runs7)),
     mileageLast14Days: round1(sumMiles(runs14)),
     mileageLast28Days: round1(sumMiles(runs28)),
+    mileageLast42Days: round1(sumMiles(runs42)),
+    mileageLast84Days: round1(sumMiles(runs84)),
+    mileageLast182Days: round1(sumMiles(runs182)),
+    mileageLast730Days: round1(sumMiles(runs730)),
+    mileageLast1825Days: round1(sumMiles(runs1825)),
     longestRunLast14DaysMiles: round1(longestRunMiles(runs14)),
     longestRunLast28DaysMiles: round1(longestRunMiles(runs28)),
+    longestRunLast182DaysMiles: round1(longestRunMiles(runs182)),
+    longestRunLast730DaysMiles: round1(longestRunMiles(runs730)),
+    longestRunLast1825DaysMiles: round1(longestRunMiles(runs1825)),
     recentIntensityIndicators: recentIntensityIndicators(runs14),
     recentMissedDays: estimateRecentMissedDays(runs14, now),
     runCountLast14Days: runs14.length,
-    runCountLast28Days: runs28.length
+    runCountLast28Days: runs28.length,
+    runCountLast182Days: runs182.length,
+    runCountLast730Days: runs730.length,
+    runCountLast1825Days: runs1825.length,
+    averageCadenceLast28Days: averageDefined(runs28.map((activity) => activity.averageCadence)),
+    averageHeartRateLast28Days: averageDefined(runs28.map((activity) => activity.averageHeartRate)),
+    relativeEffortLast28Days: sumDefined(runs28.map((activity) => activity.relativeEffort)),
+    fastestEfforts: fastestEfforts(runs, now)
   };
 }
 
@@ -60,7 +80,8 @@ export function contextForPrompt(
         ? pacePerMile(activity.averagePaceSecondsPerKm)
         : undefined,
       averageHeartRate: activity.averageHeartRate,
-      perceivedEffort: activity.perceivedEffort
+      averageCadence: activity.averageCadence,
+      relativeEffort: activity.relativeEffort
     }));
 
   return {
@@ -108,17 +129,87 @@ function recentIntensityIndicators(activities: Activity[]) {
       name.includes("workout") ||
       name.includes("race");
     const hardEffort = activity.perceivedEffort !== undefined && activity.perceivedEffort >= 7;
+    const highRelativeEffort = activity.relativeEffort !== undefined && activity.relativeEffort >= 80;
     const highHr = activity.averageHeartRate !== undefined && activity.averageHeartRate >= 155;
 
-    if (hardName || hardEffort || highHr) {
+    if (hardName || hardEffort || highRelativeEffort || highHr) {
       indicators.push(
         `${activity.startDate.slice(0, 10)} ${activity.name ?? activity.sportType}${
           activity.averageHeartRate ? `, avg HR ${Math.round(activity.averageHeartRate)}` : ""
-        }${activity.perceivedEffort ? `, effort ${activity.perceivedEffort}/10` : ""}`
+        }${activity.averageCadence ? `, cadence ${Math.round(activity.averageCadence)}` : ""}${
+          activity.relativeEffort ? `, relative effort ${activity.relativeEffort}` : ""
+        }`
       );
     }
   }
   return indicators;
+}
+
+const bestEffortTargets = [
+  { label: "400m / quarter mile", meters: 402.336 },
+  { label: "800m / half mile", meters: 804.672 },
+  { label: "1K", meters: 1000 },
+  { label: "1 mile", meters: 1609.344 },
+  { label: "2 mile", meters: 3218.688 },
+  { label: "5K", meters: 5000 },
+  { label: "10K", meters: 10000 },
+  { label: "10 mile", meters: 16093.44 },
+  { label: "Half marathon", meters: 21097.5 },
+  { label: "Marathon", meters: 42195 }
+];
+
+const bestEffortPeriods = [
+  { label: "6 months" as const, days: 182 },
+  { label: "2 years" as const, days: 730 },
+  { label: "5 years" as const, days: 1825 }
+];
+
+function fastestEfforts(runs: Activity[], now: Date): FastestEffortSummary[] {
+  const summaries: FastestEffortSummary[] = [];
+
+  for (const period of bestEffortPeriods) {
+    const periodRuns = runs.filter((activity) => daysBetween(new Date(activity.startDate), now) <= period.days);
+    for (const target of bestEffortTargets) {
+      const best = periodRuns
+        .flatMap((activity) =>
+          (activity.bestEfforts ?? [])
+            .filter((effort) => Math.abs(effort.distanceMeters - target.meters) / target.meters <= 0.08)
+            .map((effort) => ({ activity, effort }))
+        )
+        .filter(({ effort }) => effort.elapsedTimeSeconds || effort.movingTimeSeconds)
+        .sort(
+          (a, b) =>
+            (a.effort.elapsedTimeSeconds ?? a.effort.movingTimeSeconds ?? Infinity) -
+            (b.effort.elapsedTimeSeconds ?? b.effort.movingTimeSeconds ?? Infinity)
+        )[0];
+
+      if (best) {
+        const seconds = best.effort.elapsedTimeSeconds ?? best.effort.movingTimeSeconds ?? 0;
+        summaries.push({
+          period: period.label,
+          distance: target.label,
+          seconds,
+          paceSecondsPerMile: seconds / (target.meters / metersPerMile),
+          activityName: best.activity.name,
+          activityDate: best.activity.startDate.slice(0, 10)
+        });
+      }
+    }
+  }
+
+  return summaries;
+}
+
+function averageDefined(values: Array<number | undefined>) {
+  const defined = values.filter((value): value is number => value !== undefined);
+  if (!defined.length) return undefined;
+  return round1(defined.reduce((total, value) => total + value, 0) / defined.length);
+}
+
+function sumDefined(values: Array<number | undefined>) {
+  const defined = values.filter((value): value is number => value !== undefined);
+  if (!defined.length) return undefined;
+  return round1(defined.reduce((total, value) => total + value, 0));
 }
 
 function estimateRecentMissedDays(runs14: Activity[], now: Date) {

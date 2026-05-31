@@ -10,6 +10,8 @@ It does not generate a full training plan. It helps answer: given recent trainin
 - Store Strava access and refresh tokens in a local JSON file.
 - Refresh recent Strava activities.
 - Normalize activities into a provider-neutral internal model.
+- Pull up to five years of Strava activity history.
+- Incrementally enrich run activities with Strava detailed best efforts.
 - Show a compact recent activity summary.
 - Paste optional plan, goal, and subjective context.
 - Ask a running adaptation question in chat.
@@ -77,6 +79,8 @@ POSTGRES_DATABASE=postgres
 POSTGRES_USER=postgres.behomboexzgpjgdbaudk
 POSTGRES_PASSWORD=
 ```
+
+`STRAVA_DETAIL_SYNC_LIMIT` controls how many run activities are enriched with detailed Strava best-effort data per refresh. The default is `30`, which keeps Vercel requests from trying to fetch years of detailed runs in one shot.
 
 Run the app:
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  fetchDetailedRunActivities,
   fetchRecentStravaActivities,
   refreshTokensIfNeeded
 } from "@/lib/strava";
@@ -23,11 +24,17 @@ export async function POST() {
   }
 
   const newActivities = await fetchRecentStravaActivities(tokens.accessToken);
-  const activities = await saveActivities(newActivities);
+  let activities = await saveActivities(newActivities);
+  const detailSync = await fetchDetailedRunActivities(tokens.accessToken, newActivities, data.activities);
+  if (detailSync.activities.length) {
+    activities = await saveActivities(detailSync.activities);
+  }
 
   return NextResponse.json({
     refreshedAt: new Date().toISOString(),
     importedCount: newActivities.length,
+    detailedRunCount: detailSync.syncedCount,
+    detailedRunRemainingThisBatch: detailSync.remainingCount,
     totalCount: activities.length,
     activities: activities.slice(0, 20),
     summary: buildActivitySummary(activities)
