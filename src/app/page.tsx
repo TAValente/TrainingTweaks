@@ -185,6 +185,11 @@ export default function Home() {
     }
   }
 
+  async function logOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/login");
+  }
+
   const runs = useMemo(
     () => state.activities.filter((activity) => activity.sportType.toLowerCase().includes("run")),
     [state.activities]
@@ -203,6 +208,9 @@ export default function Home() {
           </a>
           <button className="button" onClick={refreshStrava} disabled={isRefreshing}>
             {isRefreshing ? "Refreshing..." : "Refresh Strava Data"}
+          </button>
+          <button className="button secondary" onClick={logOut}>
+            Log out
           </button>
         </div>
       </section>

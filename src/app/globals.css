@@ -24,6 +24,7 @@ body {
 
 button,
 textarea,
+input,
 a {
   font: inherit;
 }
@@ -293,7 +294,22 @@ textarea {
   line-height: 1.45;
 }
 
+input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fffefb;
+  color: var(--ink);
+}
+
 textarea:focus {
+  outline: 2px solid rgba(15, 118, 110, 0.24);
+  border-color: var(--accent);
+}
+
+input:focus {
   outline: 2px solid rgba(15, 118, 110, 0.24);
   border-color: var(--accent);
 }
@@ -335,6 +351,47 @@ textarea:disabled {
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.loginShell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loginPanel {
+  width: min(100%, 460px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 26px;
+}
+
+.loginPanel h1 {
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.loginCopy {
+  margin: 14px 0 24px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.loginForm {
+  display: grid;
+  gap: 14px;
+}
+
+.loginError {
+  border: 1px solid #f3b4a8;
+  border-radius: 8px;
+  background: #fff3ef;
+  color: #8f2f1f;
+  margin: 16px 0 0;
+  padding: 10px 12px;
 }
 
 @media (max-width: 980px) {

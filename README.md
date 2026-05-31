@@ -14,6 +14,7 @@ It does not generate a full training plan. It helps answer: given recent trainin
 - Incrementally enrich run activities with Strava detailed best efforts.
 - Show a compact recent activity summary.
 - Paste optional plan, goal, and subjective context.
+- Require a single-user password before exposing the app or API routes.
 - Ask a running adaptation question in chat.
 - Receive a structured answer with recommendation, alternatives, tradeoffs, risk flags, assumptions, confidence, and signals to watch.
 
@@ -50,13 +51,17 @@ Fill in:
 STRAVA_CLIENT_ID=
 STRAVA_CLIENT_SECRET=
 NEXTAUTH_SECRET=
+AUTH_SECRET=
+APP_PASSWORD=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 APP_BASE_URL=http://localhost:3000
 DATABASE_URL=
 ```
 
-`NEXTAUTH_SECRET` is reserved for future auth hardening in this MVP; the current local-only version stores only the authenticated runner's Strava token set in `.data/trainingtweaks.json`.
+`APP_PASSWORD` is the single-user login password. `AUTH_SECRET` signs the long-lived session cookie; `NEXTAUTH_SECRET` is used as a fallback if `AUTH_SECRET` is not set.
+
+The cookie lasts 180 days, so local and Vercel preview sessions stay signed in unless the browser cookie is cleared, the deployment host changes, or `AUTH_SECRET` changes.
 
 This workspace also supports `local.env` for local-only secrets because the original project used that filename.
 
@@ -81,6 +86,18 @@ POSTGRES_PASSWORD=
 ```
 
 `STRAVA_DETAIL_SYNC_LIMIT` controls how many run activities are enriched with detailed Strava best-effort data per refresh. The default is `30`, which keeps Vercel requests from trying to fetch years of detailed runs in one shot.
+
+## Vercel Auth and Preview
+
+Set `APP_PASSWORD` and `AUTH_SECRET` in both Production and Preview environments. Use the same Supabase/Postgres environment variables in Preview if you want preview deployments to read and write the same saved Strava data, plan context, goals, and chat context.
+
+You can generate a local secret in PowerShell:
+
+```powershell
+-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 48 | ForEach-Object {[char]$_})
+```
+
+Use a stable production `APP_BASE_URL` for Strava OAuth. Preview URLs change, so Strava login is most reliable against production or any custom domain configured in Strava.
 
 Run the app:
 
@@ -128,6 +145,7 @@ If `APP_BASE_URL` is omitted, the app will try Vercel's system URL environment v
 - `/api/strava/refresh` refreshes tokens if needed and imports recent activities
 - `/api/chat` builds structured running context and calls the AI
 - `/api/state` returns local app state for the UI
+- `/login` authenticates the single TrainingTweaks user
 
 ## Internal Activity Model
 
@@ -151,8 +169,8 @@ type Activity = {
 
 ## Limitations
 
-- Local single-user storage only.
-- No persistent long-term memory beyond locally saved activities and context.
+- Single-user password gate only; there are no separate user accounts or roles.
+- No persistent long-term memory beyond saved activities and context.
 - No uploaded plan parsing yet.
 - No weather integration yet.
 - No Garmin integration yet.
