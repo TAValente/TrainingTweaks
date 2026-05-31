@@ -13,6 +13,7 @@ It does not generate a full training plan. It helps answer: given recent trainin
 - Pull up to five years of Strava activity history.
 - Incrementally enrich run activities with Strava detailed best efforts.
 - Show a compact recent activity summary.
+- Select a known plan family such as Hal Higdon, Jack Daniels, Pfitzinger, Hansons, NRC, FIRST, McMillan, generic, or custom.
 - Paste optional plan, goal, and subjective context.
 - Ask a running adaptation question in chat.
 - Receive a structured answer with recommendation, alternatives, tradeoffs, risk flags, assumptions, confidence, and signals to watch.

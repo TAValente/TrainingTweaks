@@ -87,6 +87,10 @@ export function contextForPrompt(
   return {
     generatedAt: new Date().toISOString(),
     summary,
+    selectedTrainingPlan: {
+      source: context.planSource || "unknown",
+      variant: context.planVariant || "Not provided"
+    },
     planContext: context.planContext || "Not provided",
     goalsContext: context.goalsContext || "Not provided",
     subjectiveContext: context.subjectiveContext || "Not provided",

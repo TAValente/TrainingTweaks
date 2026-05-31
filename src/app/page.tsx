@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Activity, ActivitySummary, TrainingContext } from "@/lib/types";
+import { trainingPlanProfiles } from "@/lib/training-plans";
+import type { Activity, ActivitySummary, TrainingContext, TrainingPlanSource } from "@/lib/types";
 
 type AppState = {
   connected: boolean;
@@ -41,9 +42,13 @@ export default function Home() {
     activities: [],
     summary: emptySummary
   });
+  const [planSource, setPlanSource] = useState<TrainingPlanSource>("unknown");
+  const [planVariant, setPlanVariant] = useState("");
   const [planContext, setPlanContext] = useState("");
   const [goalsContext, setGoalsContext] = useState("");
   const [subjectiveContext, setSubjectiveContext] = useState("");
+  const [savedPlanSource, setSavedPlanSource] = useState<TrainingPlanSource>("unknown");
+  const [savedPlanVariant, setSavedPlanVariant] = useState("");
   const [savedPlanContext, setSavedPlanContext] = useState("");
   const [savedGoalsContext, setSavedGoalsContext] = useState("");
   const [isEditingPlan, setIsEditingPlan] = useState(false);
@@ -83,10 +88,16 @@ export default function Home() {
 
     const nextState = payload as AppState;
     setState(nextState);
+    const nextPlanSource = nextState.context?.planSource ?? "unknown";
+    const nextPlanVariant = nextState.context?.planVariant ?? "";
     const nextPlanContext = nextState.context?.planContext ?? "";
     const nextGoalsContext = nextState.context?.goalsContext ?? "";
+    setPlanSource(nextPlanSource);
+    setPlanVariant(nextPlanVariant);
     setPlanContext(nextPlanContext);
     setGoalsContext(nextGoalsContext);
+    setSavedPlanSource(nextPlanSource);
+    setSavedPlanVariant(nextPlanVariant);
     setSavedPlanContext(nextPlanContext);
     setSavedGoalsContext(nextGoalsContext);
     setSubjectiveContext(nextState.context?.subjectiveContext ?? "");
@@ -129,6 +140,8 @@ export default function Home() {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          planSource,
+          planVariant,
           planContext,
           goalsContext,
           subjectiveContext
@@ -137,6 +150,8 @@ export default function Home() {
       const payload = await parseJsonResponse(response);
       if (!response.ok) throw new Error(payload.error ?? "Context save failed.");
 
+      setSavedPlanSource(planSource);
+      setSavedPlanVariant(planVariant);
       setSavedPlanContext(planContext);
       setSavedGoalsContext(goalsContext);
       if (kind === "plan") setIsEditingPlan(false);
@@ -166,6 +181,8 @@ export default function Home() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           planContext,
+          planSource,
+          planVariant,
           goalsContext,
           subjectiveContext,
           question
@@ -271,6 +288,8 @@ export default function Home() {
                       className="miniButton secondaryMini"
                       type="button"
                       onClick={() => {
+                        setPlanSource(savedPlanSource);
+                        setPlanVariant(savedPlanVariant);
                         setPlanContext(savedPlanContext);
                         setIsEditingPlan(false);
                       }}
@@ -284,6 +303,24 @@ export default function Home() {
                   </button>
                 )}
               </span>
+              <select
+                value={planSource}
+                disabled={!isEditingPlan}
+                onChange={(event) => setPlanSource(event.target.value as TrainingPlanSource)}
+              >
+                {trainingPlanProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.label}
+                    {profile.examples ? ` - ${profile.examples}` : ""}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={planVariant}
+                disabled={!isEditingPlan}
+                onChange={(event) => setPlanVariant(event.target.value)}
+                placeholder="Variant / level, e.g. 18/55, 2Q, NRC Marathon, Novice 2"
+              />
               <textarea
                 value={planContext}
                 disabled={!isEditingPlan}

@@ -1,5 +1,6 @@
 import { getOptionalEnv, getRequiredEnv } from "./env";
 import { contextForPrompt } from "./summary";
+import { getTrainingPlanProfile, planKnowledgeGuide } from "./training-plans";
 import type { Activity, TrainingContext } from "./types";
 
 type OpenAIResponse = {
@@ -62,10 +63,17 @@ function buildUserContent(
   question: string,
   runningContext: unknown
 ) {
+  const selectedPlan = getTrainingPlanProfile(trainingContext.planSource);
   return `USER INPUTS
 
 Current question:
 ${question}
+
+Selected training plan:
+${selectedPlan.label}
+
+Plan variant / level:
+${trainingContext.planVariant?.trim() || "Not provided"}
 
 Plan context:
 ${trainingContext.planContext?.trim() || "Not provided"}
@@ -79,6 +87,11 @@ ${trainingContext.subjectiveContext?.trim() || "Not provided"}
 AVAILABLE DATA
 
 You have access to recent and historical Strava-derived running data. Use whatever is relevant to answer the user's question; ignore what is not relevant. Do not recite the data back unless it supports the reasoning.
+
+The user may select a named training plan family. Use the selected plan profile as helpful background, but the user's pasted plan details and recent training data are more important than generic plan knowledge.
+
+Plan knowledge guide:
+${planKnowledgeGuide(trainingContext.planSource)}
 
 Available fields may include:
 - mileage windows: 7d, 14d, 28d, 6w, 12w, 6mo, 2y, 5y
