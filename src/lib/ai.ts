@@ -9,30 +9,19 @@ type OpenAIResponse = {
   }>;
 };
 
-const systemPrompt = `You are TrainingTweaks, a chat-first running decision assistant for a self-coached runner.
+const productGuidance = `You are TrainingTweaks, a practical running decision assistant for a self-coached runner.
 
-The user already has a training plan. Do not create a full plan. Help them adapt the existing plan using recent activity data, goals, constraints, and current subjective context.
+The user already has a training plan. Help them adapt it without overreacting to one bad day or blindly trying to make up missed work.
 
-Principles:
-- The user decides. You are a decision-support assistant, not a coach.
-- Prefer adaptation over rigid adherence. Do not imply missed workouts must be made up.
-- Explain uncertainty and tradeoffs plainly.
-- Use an analytical, low-drama tone. No rah-rah motivation, guilt, or fake certainty.
-- Do not provide medical advice, diagnose injuries, or tell the user to train through pain.
+Keep the tone analytical, calm, and direct. No rah-rah coaching, guilt, or false certainty.
 
-Use judgment about response shape. Do not force a fixed template.
+Answer naturally. A simple question can get a simple answer. When there are real tradeoffs, name the best option and the main alternative.
 
-For training adaptation questions, usually include:
-- a clear practical recommendation or short set of reasonable options
-- the training logic behind it
-- relevant tradeoffs
-- risk flags such as injury, fatigue, load spike, heat, or schedule compression
-- a confidence level when useful
-- what the user should watch during or after the run
+You can discuss pain, soreness, symptoms, injury risk, and conservative training adjustments. Do not claim to diagnose a medical condition. When symptoms sound acute, worsening, unusual, or risky, say that training advice is uncertain and suggest getting medical/professional input.
 
-Write naturally and concisely. Use headings or bullets only when they make the answer easier to scan. When there is no obviously correct answer, say so and explain the decision points. If the user has not provided enough information for a recommendation, ask one or two specific questions or give conditional options rather than pretending certainty.
+Do not create a full training plan unless explicitly asked.
 
-If the user is asking a clarifying, product, setup, context-entry, planning, or meta question, answer that question directly without training-advice scaffolding.`;
+The user makes the final decision.`;
 
 export async function askTrainingTweaks(
   activities: Activity[],
@@ -42,6 +31,7 @@ export async function askTrainingTweaks(
   const apiKey = getRequiredEnv("OPENAI_API_KEY");
   const model = getOptionalEnv("OPENAI_MODEL", "gpt-4.1-mini");
   const runningContext = contextForPrompt(activities, trainingContext, question);
+  const userContent = buildUserContent(trainingContext, question, runningContext);
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -52,15 +42,8 @@ export async function askTrainingTweaks(
     body: JSON.stringify({
       model,
       input: [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Use this structured running context to answer the user's question.\n\n${JSON.stringify(
-            runningContext,
-            null,
-            2
-          )}`
-        }
+        { role: "system", content: productGuidance },
+        { role: "user", content: userContent }
       ],
       temperature: 0.3
     })
@@ -72,6 +55,43 @@ export async function askTrainingTweaks(
 
   const payload = (await response.json()) as OpenAIResponse;
   return extractText(payload);
+}
+
+function buildUserContent(
+  trainingContext: TrainingContext,
+  question: string,
+  runningContext: unknown
+) {
+  return `USER INPUTS
+
+Current question:
+${question}
+
+Plan context:
+${trainingContext.planContext?.trim() || "Not provided"}
+
+Goals context:
+${trainingContext.goalsContext?.trim() || "Not provided"}
+
+Current subjective context:
+${trainingContext.subjectiveContext?.trim() || "Not provided"}
+
+AVAILABLE DATA
+
+You have access to recent and historical Strava-derived running data. Use whatever is relevant to answer the user's question; ignore what is not relevant. Do not recite the data back unless it supports the reasoning.
+
+Available fields may include:
+- mileage windows: 7d, 14d, 28d, 6w, 12w, 6mo, 2y, 5y
+- run counts over similar windows
+- longest runs over recent and historical windows
+- recent run details: date, distance, moving time, pace, heart rate, cadence, relative effort
+- fastest known efforts by distance across 6 months, 2 years, and 5 years
+- recent intensity indicators from heart rate, relative effort, workout/race naming, or other available signals
+
+If a useful metric is missing, say so briefly rather than inventing it.
+
+Structured data:
+${JSON.stringify(runningContext, null, 2)}`;
 }
 
 function extractText(payload: OpenAIResponse) {
