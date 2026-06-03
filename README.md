@@ -14,6 +14,7 @@ The repo keeps the product doctrine in [docs](docs):
 - [Principles](docs/principles.md)
 - [Architecture](docs/architecture.md)
 - [Economics](docs/economics.md)
+- [Roadmap](docs/roadmap.md)
 
 Key engineering rule: deterministic systems should calculate facts and risk signals before any LLM call. The LLM should handle judgment, tradeoffs, uncertainty, prioritization, and explanation.
 

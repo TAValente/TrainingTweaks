@@ -127,6 +127,19 @@ Examples:
 - training philosophy
 - decision tendencies
 
+### Runner Doctrine
+
+The runner's durable decision posture.
+
+Examples:
+
+- current priority: protect build, stick to plan, push race goal
+- plan respect level
+- risk posture
+- explicit counterbalance notes
+- runner-specific beliefs or rituals
+- inferred tendencies, treated as hypotheses
+
 ### Plan Context
 
 Existing training plan.
@@ -149,9 +162,14 @@ Fields:
 - timestamp
 - question
 - context snapshot
+- runner doctrine snapshot
+- risk signals
 - recommendation
+- intended recommendation direction
 - alternatives
 - confidence
+- explicit feedback
+- adherence classification
 - user action
 - outcome
 

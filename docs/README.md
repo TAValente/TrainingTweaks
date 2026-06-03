@@ -6,5 +6,6 @@ These documents capture the product doctrine, engineering principles, architectu
 - [Principles](principles.md): decision rules for product and engineering tradeoffs.
 - [Architecture](architecture.md): system layers, entities, data flow, and storage boundaries.
 - [Economics](economics.md): cost philosophy and rules for keeping the system efficient.
+- [Roadmap](roadmap.md): current build sequence and product priorities.
 
 The short version: TrainingTweaks is organized around decisions, not activities or plans. Deterministic systems should calculate facts and risk signals; the LLM should provide judgment, tradeoffs, uncertainty, and recommendations.
