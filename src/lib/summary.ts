@@ -90,6 +90,11 @@ export function contextForPrompt(
           .join("; ")}.`
       : "Recent runs newest-first: none."
   ];
+  const loadSnapshot = [
+    `Recent volume: ${summary.mileageLast7Days} mi / 7d, ${summary.mileageLast14Days} mi / 14d, ${summary.mileageLast28Days} mi / 28d.`,
+    `Recent long run: ${summary.longestRunLast14DaysMiles} mi in the last 14d; ${summary.longestRunLast28DaysMiles} mi in the last 28d.`,
+    `Run frequency: ${summary.runCountLast14Days} runs / 14d, ${summary.runCountLast28Days} runs / 28d.`
+  ];
 
   return {
     generatedAt: now.toISOString(),
@@ -98,6 +103,7 @@ export function contextForPrompt(
       todayDayOfWeek: today.dayOfWeek,
       timeZone,
       timingSnapshot,
+      loadSnapshot,
       lastRun: lastRun
         ? {
             date: lastRun.date,
