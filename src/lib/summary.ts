@@ -76,6 +76,20 @@ export function contextForPrompt(
     .slice(0, 12)
     .map((activity) => runForPrompt(activity, now, timeZone));
   const lastRun = recentRuns[0];
+  const timingSnapshot = [
+    `Today is ${today.dayOfWeek}, ${today.date} (${timeZone}).`,
+    lastRun
+      ? `Last run was ${lastRun.relativeToToday} on ${lastRun.dayOfWeek}, ${lastRun.date}: ${lastRun.miles} mi${
+          lastRun.name ? ` (${lastRun.name})` : ""
+        }.`
+      : "No recent run is available.",
+    recentRuns.length
+      ? `Recent runs newest-first: ${recentRuns
+          .slice(0, 5)
+          .map((run) => `${run.dayOfWeek} ${run.date}, ${run.relativeToToday}, ${run.miles} mi`)
+          .join("; ")}.`
+      : "Recent runs newest-first: none."
+  ];
 
   return {
     generatedAt: now.toISOString(),
@@ -83,6 +97,7 @@ export function contextForPrompt(
       todayLocalDate: today.date,
       todayDayOfWeek: today.dayOfWeek,
       timeZone,
+      timingSnapshot,
       lastRun: lastRun
         ? {
             date: lastRun.date,
