@@ -395,8 +395,7 @@ export default function Home() {
               <Markdownish text={answer} />
             ) : (
               <p className="muted">
-                Answers will use recommendation, why, alternatives, risk flags, confidence, and
-                what to watch.
+                Answers will prioritize the timing, the practical recommendation, and the key tradeoff.
               </p>
             )}
           </article>
