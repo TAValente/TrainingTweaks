@@ -11,7 +11,7 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedNext = params.get("next");
-    if (requestedNext?.startsWith("/")) {
+    if (requestedNext?.startsWith("/") && !requestedNext.startsWith("//")) {
       setNextPath(requestedNext);
     }
   }, []);
