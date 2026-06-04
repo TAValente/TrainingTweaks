@@ -1,0 +1,99 @@
+# TrainingTweaks Roadmap
+
+This roadmap is organized around decision quality, not feature volume.
+
+## 1. Deterministic Risk Layer
+
+Build a first-class risk layer before expanding recommendation features.
+
+Scope:
+
+- workload spike signals
+- long-run progression signals
+- recent intensity density
+- recovery gap and missed-day restart signals
+- injury or pain mentions from subjective context
+- missing-context signals that should reduce confidence
+
+Output structured risk signals for the judgment layer. The LLM should interpret these signals, not invent them from raw activity data.
+
+## 2. Runner Doctrine
+
+Add a durable personal doctrine object for the runner.
+
+Scope:
+
+- current priority: protect build, stick to plan, push race goal
+- plan respect level
+- risk posture
+- explicit counterbalance notes
+- runner-specific training beliefs or rituals
+- inferred tendencies, treated as hypotheses
+
+The doctrine should help TrainingTweaks decide how convicted to be when the user's current impulse conflicts with their stated goals.
+
+## 3. Decision Memory
+
+Persist decisions so recommendations can be evaluated after the fact.
+
+Scope:
+
+- question
+- context snapshot
+- risk signals
+- recommendation
+- priority/doctrine used
+- intended recommendation direction
+- actual behavior observed from Strava
+- user feedback when available
+- adherence classification: exact, partial, directionally aligned, ignored, unknown
+- outcome notes
+
+This creates the loop:
+
+```text
+Decision -> Recommendation -> Actual Behavior -> Outcome
+```
+
+## 4. Feedback and Annoyance Detection
+
+Learn whether recommendations are helping without adding heavy user burden.
+
+Scope:
+
+- one-tap feedback after answers
+- compare recommendations to subsequent Strava behavior
+- infer directional alignment, not only exact compliance
+- detect whether friction-reduction advice increases execution
+- detect whether repeated advice is ignored or disliked
+- retreat from default friction-reduction advice when it appears annoying or unhelpful
+- make doctrine suggestions only after repeated evidence
+
+Execution alone is not enough. A run completed after a suggestion may mean the advice worked, but it may also mean the user felt pressured. A workout that differs from the exact recommendation may still show that the advice helped. TrainingTweaks should measure behavioral influence, satisfaction, and repeated preference signals where practical.
+
+## 5. Plan Understanding
+
+Move from pasted plan context toward structured plan interpretation.
+
+Scope:
+
+- support uploaded or pasted plan blocks
+- identify planned workout intent
+- distinguish quality, easy, long run, recovery, and rest days
+- preserve the plan's style and aggressiveness
+
+TrainingTweaks should adapt the user's existing plan instead of creating a new one.
+
+## 6. External Context
+
+Add contextual signals that materially change recommendations.
+
+Candidates:
+
+- weather and heat
+- race date proximity
+- travel or schedule constraints
+- sleep and soreness trends
+- future Garmin or other provider integrations
+
+These should be added only when they improve decisions enough to justify the extra complexity.

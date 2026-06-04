@@ -4,6 +4,20 @@ TrainingTweaks is a chat-first running decision assistant that helps a self-coac
 
 It does not generate a full training plan. It helps answer: given recent training, goals, constraints, and how the runner feels today, what are the reasonable options and tradeoffs?
 
+## Product Doctrine
+
+TrainingTweaks is organized around decisions, not activities or plans. Activities, plans, and goals are inputs; the core output is an actionable recommendation that helps the runner make an informed choice.
+
+The repo keeps the product doctrine in [docs](docs):
+
+- [Doctrine](docs/doctrine.md)
+- [Principles](docs/principles.md)
+- [Architecture](docs/architecture.md)
+- [Economics](docs/economics.md)
+- [Roadmap](docs/roadmap.md)
+
+Key engineering rule: deterministic systems should calculate facts and risk signals before any LLM call. The LLM should handle judgment, tradeoffs, uncertainty, prioritization, and explanation.
+
 ## MVP
 
 - Connect Strava locally with OAuth.
@@ -13,10 +27,11 @@ It does not generate a full training plan. It helps answer: given recent trainin
 - Pull up to five years of Strava activity history.
 - Incrementally enrich run activities with Strava detailed best efforts.
 - Show a compact recent activity summary.
+- Select a known plan family such as Hal Higdon, Jack Daniels, Pfitzinger, Hansons, NRC, FIRST, McMillan, generic, or custom.
 - Paste optional plan, goal, and subjective context.
 - Require a single-user password before exposing the app or API routes.
 - Ask a running adaptation question in chat.
-- Receive a structured answer with recommendation, alternatives, tradeoffs, risk flags, assumptions, confidence, and signals to watch.
+- Receive a direct recommendation grounded in doctrine, context, recent training, and the user's current constraints.
 - Persist recent model runs for later prompt review and evaluation.
 
 ## Caveat
