@@ -33,10 +33,26 @@ export type StravaTokenSet = {
 };
 
 export type TrainingContext = {
+  planSource?: TrainingPlanSource;
+  planVariant?: string;
   planContext?: string;
   goalsContext?: string;
   subjectiveContext?: string;
 };
+
+export type TrainingPlanSource =
+  | "unknown"
+  | "hal_higdon"
+  | "jack_daniels"
+  | "pfitzinger"
+  | "hansons"
+  | "generic_online"
+  | "nike_run_club"
+  | "first"
+  | "mcmillan"
+  | "custom_coach_club"
+  | "other_named"
+  | "custom";
 
 export type AppData = {
   strava?: StravaTokenSet;

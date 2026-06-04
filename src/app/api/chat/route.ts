@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
     }
 
     const context: TrainingContext = {
+      planSource: body.planSource,
+      planVariant: body.planVariant?.trim(),
       planContext: body.planContext?.trim(),
       goalsContext: body.goalsContext?.trim(),
       subjectiveContext: body.subjectiveContext?.trim()
