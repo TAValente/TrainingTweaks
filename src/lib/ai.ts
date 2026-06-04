@@ -106,7 +106,7 @@ function extractText(payload: OpenAIResponse) {
 }
 
 function loadDoctrineDocs() {
-  const paths = ["docs/doctrine.md", "docs/principles.md"];
+  const paths = ["docs/runtime-doctrine.md"];
   const docs = paths
     .map((path) => {
       const fullPath = join(process.cwd(), path);
@@ -117,5 +117,5 @@ function loadDoctrineDocs() {
 
   if (docs.length) return docs.join("\n\n---\n\n");
 
-  return `TrainingTweaks helps a self-coached runner adapt an existing plan. It is decision support, not a coach or plan generator. Make the practical call, explain the decisive reason briefly, and ask only for information that would materially change the recommendation.`;
+  return `TrainingTweaks is a decision product. Make the practical call, give the decisive reason briefly, and ask only for information that would materially change the recommendation.`;
 }

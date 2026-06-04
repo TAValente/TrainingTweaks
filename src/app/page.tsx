@@ -171,7 +171,7 @@ export default function Home() {
     if (!question.trim()) return;
 
     setIsAsking(true);
-    setStatus("Reasoning through the training tradeoffs...");
+    setStatus("Reasoning through the training decision...");
     setError("");
     setAnswer("");
 
