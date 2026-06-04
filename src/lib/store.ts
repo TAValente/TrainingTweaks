@@ -2,16 +2,18 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { getDatabasePoolConfig } from "./database";
-import type { AppData, Activity, StravaTokenSet, TrainingContext } from "./types";
+import type { AppData, Activity, StoredModelRun, StravaTokenSet, TrainingContext } from "./types";
 
 const storePath = join(process.cwd(), ".data", "trainingtweaks.json");
 const appStateId = "default";
+const maxStoredModelRuns = 100;
 let pool: Pool | undefined;
 let schemaReady: Promise<void> | undefined;
 
 function emptyData(): AppData {
   return {
-    activities: []
+    activities: [],
+    modelRuns: []
   };
 }
 
@@ -54,7 +56,8 @@ async function readDatabaseStore(database: Pool): Promise<AppData> {
   return {
     ...emptyData(),
     ...data,
-    activities: data?.activities ?? []
+    activities: data?.activities ?? [],
+    modelRuns: data?.modelRuns ?? []
   };
 }
 
@@ -65,7 +68,8 @@ async function readFileStore(): Promise<AppData> {
     return {
       ...emptyData(),
       ...parsed,
-      activities: parsed.activities ?? []
+      activities: parsed.activities ?? [],
+      modelRuns: parsed.modelRuns ?? []
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -138,6 +142,12 @@ export async function saveActivities(activities: Activity[]) {
 export async function saveContext(context: TrainingContext) {
   const data = await readStore();
   await writeStore({ ...data, context });
+}
+
+export async function appendModelRun(modelRun: StoredModelRun) {
+  const data = await readStore();
+  const modelRuns = [...(data.modelRuns ?? []), modelRun].slice(-maxStoredModelRuns);
+  await writeStore({ ...data, modelRuns });
 }
 
 function mergeActivity(existing: Activity | undefined, next: Activity): Activity {

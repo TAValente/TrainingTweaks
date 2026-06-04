@@ -38,10 +38,36 @@ export type TrainingContext = {
   subjectiveContext?: string;
 };
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type StoredModelRun = {
+  id: string;
+  timestamp: string;
+  question: string;
+  trainingContext: TrainingContext;
+  runningContext?: JsonValue;
+  model?: string;
+  openAIRequest?: JsonValue;
+  rawModelResponse?: JsonValue | string;
+  renderedAnswer?: string;
+  error?: {
+    message: string;
+    status?: number;
+    rawResponse?: JsonValue | string;
+  };
+};
+
 export type AppData = {
   strava?: StravaTokenSet;
   activities: Activity[];
   context?: TrainingContext;
+  modelRuns?: StoredModelRun[];
   lastRefreshAt?: string;
 };
 

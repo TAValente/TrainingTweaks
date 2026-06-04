@@ -17,6 +17,7 @@ It does not generate a full training plan. It helps answer: given recent trainin
 - Require a single-user password before exposing the app or API routes.
 - Ask a running adaptation question in chat.
 - Receive a structured answer with recommendation, alternatives, tradeoffs, risk flags, assumptions, confidence, and signals to watch.
+- Persist recent model runs for later prompt review and evaluation.
 
 ## Caveat
 
@@ -72,6 +73,8 @@ For local laptop use, leaving `DATABASE_URL` blank stores data in `.data/trainin
 For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write.
 
 Schema changes are tracked in [supabase/migrations](supabase/migrations). The current migration creates the single JSON-backed app state table used by the MVP.
+
+Chat requests append model run records to the same app state, whether backed by local JSON or Supabase/Postgres JSONB. Each record stores the question, training context, structured running context, model, OpenAI request body, raw response, rendered answer, and model-call error details when applicable. The app keeps the latest 100 runs to prevent unbounded local state growth, and API keys or auth tokens are not stored in these records.
 
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.
 
