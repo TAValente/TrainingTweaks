@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOptionalEnv, getRequiredEnv } from "./env";
 import { contextForPrompt } from "./summary";
-import type { Activity, JsonValue, TrainingContext } from "./types";
+import type { Activity, JsonObject, JsonValue, TrainingContext } from "./types";
 
 type OpenAIResponse = {
   output_text?: string;
@@ -11,7 +11,7 @@ type OpenAIResponse = {
   }>;
 };
 
-type OpenAIRequestBody = {
+type OpenAIRequestBody = JsonObject & {
   model: string;
   input: Array<{ role: "system" | "user"; content: string }>;
   max_output_tokens: number;

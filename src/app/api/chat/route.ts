@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { askTrainingTweaks, TrainingTweaksModelError } from "@/lib/ai";
 import { appendModelRun, getData, saveContext } from "@/lib/store";
-import type { JsonValue, StoredModelRun, TrainingContext } from "@/lib/types";
+import type { StoredModelRun, TrainingContext } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
       trainingContext: context,
       runningContext: modelCall.runningContext,
       model: modelCall.model,
-      openAIRequest: modelCall.openAIRequest as unknown as JsonValue,
-      rawModelResponse: modelCall.rawModelResponse as unknown as JsonValue,
+      openAIRequest: modelCall.openAIRequest,
+      rawModelResponse: modelCall.rawModelResponse,
       renderedAnswer: modelCall.answer
     });
 
@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
         trainingContext: context,
         runningContext: modelError?.runningContext,
         model: modelError?.model,
-        openAIRequest: modelError?.openAIRequest as JsonValue | undefined,
-        rawModelResponse: modelError?.rawModelResponse as JsonValue | string | undefined,
+        openAIRequest: modelError?.openAIRequest,
+        rawModelResponse: modelError?.rawModelResponse,
         error: {
           message,
           status: modelError?.status,
-          rawResponse: modelError?.rawModelResponse as JsonValue | string | undefined
+          rawResponse: modelError?.rawModelResponse
         }
       });
     }

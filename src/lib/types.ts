@@ -60,7 +60,9 @@ export type JsonValue =
   | boolean
   | null
   | JsonValue[]
-  | { [key: string]: JsonValue };
+  | JsonObject;
+
+export type JsonObject = { [key: string]: JsonValue };
 
 export type StoredModelRun = {
   id: string;
