@@ -24,6 +24,8 @@ body {
 
 button,
 textarea,
+select,
+input,
 a {
   font: inherit;
 }
@@ -293,12 +295,27 @@ textarea {
   line-height: 1.45;
 }
 
-textarea:focus {
+select,
+input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+  color: var(--ink);
+  padding: 0 12px;
+}
+
+textarea:focus,
+select:focus,
+input:focus {
   outline: 2px solid rgba(15, 118, 110, 0.24);
   border-color: var(--accent);
 }
 
-textarea:disabled {
+textarea:disabled,
+select:disabled,
+input:disabled {
   background: #f0eee7;
   color: #575a53;
   cursor: default;

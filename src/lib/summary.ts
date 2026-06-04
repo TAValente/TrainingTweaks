@@ -1,6 +1,7 @@
 import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
 
 const metersPerMile = 1609.344;
+const defaultTimeZone = "America/New_York";
 
 export function isRun(activity: Activity) {
   const sport = activity.sportType.toLowerCase();
@@ -12,9 +13,10 @@ export function miles(meters?: number) {
 }
 
 export function buildActivitySummary(activities: Activity[], now = new Date()): ActivitySummary {
+  const sortedActivities = [...activities].sort(byNewestStartDate);
   const runs = activities
     .filter(isRun)
-    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    .sort(byNewestStartDate);
 
   const lastRun = runs[0];
   const windowRuns = (days: number) =>
@@ -30,7 +32,7 @@ export function buildActivitySummary(activities: Activity[], now = new Date()): 
   const runs1825 = windowRuns(1825);
 
   return {
-    lastActivityDate: activities[0]?.startDate,
+    lastActivityDate: sortedActivities[0]?.startDate,
     daysSinceLastRun: lastRun ? Math.floor(daysBetween(new Date(lastRun.startDate), now)) : undefined,
     mileageLast7Days: round1(sumMiles(runs7)),
     mileageLast14Days: round1(sumMiles(runs14)),
@@ -64,29 +66,61 @@ export function contextForPrompt(
   context: TrainingContext,
   question: string
 ) {
-  const summary = buildActivitySummary(activities);
+  const now = new Date();
+  const timeZone = defaultTimeZone;
+  const summary = buildActivitySummary(activities, now);
+  const today = localDateParts(now, timeZone);
   const recentRuns = activities
     .filter(isRun)
+    .sort(byNewestStartDate)
     .slice(0, 12)
-    .map((activity) => ({
-      date: activity.startDate.slice(0, 10),
-      name: activity.name,
-      sportType: activity.sportType,
-      miles: round1(miles(activity.distanceMeters)),
-      movingTimeMinutes: activity.movingTimeSeconds
-        ? Math.round(activity.movingTimeSeconds / 60)
-        : undefined,
-      avgPaceMinPerMile: activity.averagePaceSecondsPerKm
-        ? pacePerMile(activity.averagePaceSecondsPerKm)
-        : undefined,
-      averageHeartRate: activity.averageHeartRate,
-      averageCadence: activity.averageCadence,
-      relativeEffort: activity.relativeEffort
-    }));
+    .map((activity) => runForPrompt(activity, now, timeZone));
+  const lastRun = recentRuns[0];
+  const timingSnapshot = [
+    `Today is ${today.dayOfWeek}, ${today.date} (${timeZone}).`,
+    lastRun
+      ? `Last run was ${lastRun.relativeToToday} on ${lastRun.dayOfWeek}, ${lastRun.date}: ${lastRun.miles} mi${
+          lastRun.name ? ` (${lastRun.name})` : ""
+        }.`
+      : "No recent run is available.",
+    recentRuns.length
+      ? `Recent runs newest-first: ${recentRuns
+          .slice(0, 5)
+          .map((run) => `${run.dayOfWeek} ${run.date}, ${run.relativeToToday}, ${run.miles} mi`)
+          .join("; ")}.`
+      : "Recent runs newest-first: none."
+  ];
+  const loadSnapshot = [
+    `Recent volume: ${summary.mileageLast7Days} mi / 7d, ${summary.mileageLast14Days} mi / 14d, ${summary.mileageLast28Days} mi / 28d.`,
+    `Recent long run: ${summary.longestRunLast14DaysMiles} mi in the last 14d; ${summary.longestRunLast28DaysMiles} mi in the last 28d.`,
+    `Run frequency: ${summary.runCountLast14Days} runs / 14d, ${summary.runCountLast28Days} runs / 28d.`
+  ];
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: now.toISOString(),
+    calendarContext: {
+      todayLocalDate: today.date,
+      todayDayOfWeek: today.dayOfWeek,
+      timeZone,
+      timingSnapshot,
+      loadSnapshot,
+      lastRun: lastRun
+        ? {
+            date: lastRun.date,
+            dayOfWeek: lastRun.dayOfWeek,
+            daysAgo: lastRun.daysAgo,
+            relativeToToday: lastRun.relativeToToday,
+            name: lastRun.name,
+            miles: lastRun.miles
+          }
+        : undefined,
+      note: "Use todayLocalDate, todayDayOfWeek, and daysAgo values for schedule reasoning."
+    },
     summary,
+    selectedTrainingPlan: {
+      source: context.planSource || "unknown",
+      variant: context.planVariant || "Not provided"
+    },
     planContext: context.planContext || "Not provided",
     goalsContext: context.goalsContext || "Not provided",
     subjectiveContext: context.subjectiveContext || "Not provided",
@@ -143,6 +177,30 @@ function recentIntensityIndicators(activities: Activity[]) {
     }
   }
   return indicators;
+}
+
+function runForPrompt(activity: Activity, now: Date, timeZone: string) {
+  const parts = localDateParts(new Date(activity.startDate), timeZone);
+  const daysAgo = daysBetweenLocalDates(parts.date, localDateParts(now, timeZone).date);
+
+  return {
+    date: parts.date,
+    dayOfWeek: parts.dayOfWeek,
+    daysAgo,
+    relativeToToday: relativeDayLabel(daysAgo),
+    name: activity.name,
+    sportType: activity.sportType,
+    miles: round1(miles(activity.distanceMeters)),
+    movingTimeMinutes: activity.movingTimeSeconds
+      ? Math.round(activity.movingTimeSeconds / 60)
+      : undefined,
+    avgPaceMinPerMile: activity.averagePaceSecondsPerKm
+      ? pacePerMile(activity.averagePaceSecondsPerKm)
+      : undefined,
+    averageHeartRate: activity.averageHeartRate,
+    averageCadence: activity.averageCadence,
+    relativeEffort: activity.relativeEffort
+  };
 }
 
 const bestEffortTargets = [
@@ -225,6 +283,42 @@ function estimateRecentMissedDays(runs14: Activity[], now: Date) {
 
 function daysBetween(then: Date, now: Date) {
   return Math.max(0, (now.getTime() - then.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function byNewestStartDate(a: Activity, b: Activity) {
+  return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+}
+
+function localDateParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone,
+    weekday: "long",
+    year: "numeric"
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    dayOfWeek: value("weekday")
+  };
+}
+
+function daysBetweenLocalDates(then: string, now: string) {
+  const thenTime = utcTimeForLocalDate(then);
+  const nowTime = utcTimeForLocalDate(now);
+  return Math.max(0, Math.round((nowTime - thenTime) / (24 * 60 * 60 * 1000)));
+}
+
+function utcTimeForLocalDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
+function relativeDayLabel(daysAgo: number) {
+  if (daysAgo === 0) return "today";
+  if (daysAgo === 1) return "yesterday";
+  return `${daysAgo} days ago`;
 }
 
 function round1(value: number) {
