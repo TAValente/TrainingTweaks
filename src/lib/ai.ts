@@ -10,13 +10,19 @@ type OpenAIResponse = {
   }>;
 };
 
+type DecisionPayload = {
+  recommendation?: string;
+  reason?: string;
+  caveat?: string;
+};
+
 const productGuidance = `You are TrainingTweaks, a practical running decision assistant for a self-coached runner.
 
 The user already has a training plan. Help them adapt it without overreacting to one bad day or blindly trying to make up missed work.
 
 Keep the tone analytical, calm, and direct. No rah-rah coaching, guilt, or false certainty.
 
-Answer naturally and concisely. A simple question can get a simple answer. Most answers should be under 150 words and start with the practical recommendation, then give the decisive reason and the next action.
+Return a compact JSON decision. Do not write Markdown, section headings, option lists, or explanatory training-plan boilerplate.
 
 Schedule reasoning is critical. Anchor advice to the provided calendar context, including today's local date/day, the last run date, and recent run days. Preserve user-stated event durations and schedule constraints; do not collapse a multi-day event into a one-day constraint. Do not assign a date or day to an event unless the user provided it or it is explicit in context. If the timing is ambiguous enough to change the recommendation, ask one concise clarifying question instead of assuming.
 
@@ -62,7 +68,7 @@ export async function askTrainingTweaks(
   }
 
   const payload = (await response.json()) as OpenAIResponse;
-  return extractText(payload);
+  return formatDecision(extractText(payload));
 }
 
 function buildUserContent(
@@ -132,13 +138,18 @@ ${JSON.stringify(runningContext, null, 2)}
 
 RESPONSE REQUIREMENTS
 
-- Start with the recommendation. Do not restate the user's whole dilemma first.
-- Keep the answer under 150 words unless the user asks for detail.
-- Prefer 1-2 short paragraphs. Use bullets only when they are genuinely clearer than prose.
-- Do not present a symmetric "Option 1 / Option 2" menu unless the user explicitly asks for options.
-- Do not use checklist headings such as "Training logic", "Tradeoffs", "Risk flags", "Confidence", "What to watch", or "Summary".
-- If giving an alternative, keep it subordinate to the main recommendation and name the condition that would change the call.
-- For timing-sensitive questions, mention only relevant actual days from calendarContext. Preserve multi-day events as multi-day constraints. Do not invent dates for vague events.
+Return ONLY valid JSON with this shape:
+{
+  "recommendation": "One sentence with the call. If the right move is to rest or skip optional mileage, say that directly.",
+  "reason": "One sentence with the decisive training reason. Focus on load, rest, timing, or schedule risk; do not explain basic concepts like what long runs are for.",
+  "caveat": "Optional one sentence naming the condition that would change the call. Use an empty string if not needed."
+}
+
+Rules:
+- Do not say the user ran today unless calendarContext.lastRun.relativeToToday is "today".
+- Do not invent dates for vague events.
+- Do not provide Option 1 / Option 2.
+- Do not include Markdown, bullets, labels, headings, confidence, risk flags, summaries, or what-to-watch sections.
 - Do not repeat mileage, HR, effort, or plan facts unless they directly justify the recommendation.`;
 }
 
@@ -153,4 +164,49 @@ function extractText(payload: OpenAIResponse) {
 
   if (chunks.length) return chunks.join("\n");
   throw new Error("OpenAI response did not include text output.");
+}
+
+function formatDecision(text: string) {
+  const parsed = parseDecision(text);
+  if (!parsed) return compactFallback(text);
+
+  const recommendation = cleanDecisionPart(parsed.recommendation);
+  const reason = cleanDecisionPart(parsed.reason);
+  const caveat = cleanDecisionPart(parsed.caveat);
+  const answer = [recommendation, [reason, caveat].filter(Boolean).join(" ")].filter(Boolean).join("\n\n");
+
+  return answer || compactFallback(text);
+}
+
+function parseDecision(text: string): DecisionPayload | undefined {
+  try {
+    return JSON.parse(text) as DecisionPayload;
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return undefined;
+    try {
+      return JSON.parse(match[0]) as DecisionPayload;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+function cleanDecisionPart(value?: string) {
+  return value
+    ?.replace(/\s+/g, " ")
+    .replace(/^[-*\d.\s]+/, "")
+    .trim()
+    .slice(0, 320);
+}
+
+function compactFallback(text: string) {
+  return text
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*\*/g, "")
+    .split(/\n{2,}/)
+    .slice(0, 2)
+    .join("\n\n")
+    .slice(0, 700)
+    .trim();
 }
