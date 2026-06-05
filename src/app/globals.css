@@ -372,6 +372,91 @@ input:disabled {
   min-height: 76px;
 }
 
+.reviewToolbar {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+  margin: 14px 0 16px;
+}
+
+.reviewToolbar label {
+  width: min(100%, 260px);
+}
+
+.runList {
+  display: grid;
+  gap: 12px;
+}
+
+.runItem {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.runHeader {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.runHeader h2 {
+  margin: 4px 0 0;
+  max-width: 880px;
+}
+
+.runMeta,
+.runFeedbackNote {
+  color: var(--muted);
+  margin: 0;
+}
+
+.runAnswer {
+  line-height: 1.55;
+  margin: 0;
+  max-height: 8.5rem;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.runBadge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.runBadge.positive {
+  border-color: rgba(15, 118, 110, 0.32);
+  color: var(--accent-dark);
+}
+
+.runBadge.negative,
+.runBadge.error {
+  border-color: #f3b4a8;
+  color: #8f2f1f;
+}
+
+.runDetails {
+  background: #20211d;
+  border-radius: 8px;
+  color: #fffdf8;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+  max-height: 520px;
+  overflow: auto;
+  padding: 14px;
+}
+
 .loginShell {
   min-height: 100svh;
   display: grid;
@@ -426,6 +511,12 @@ input:disabled {
   .grid,
   .contextRow {
     grid-template-columns: 1fr;
+  }
+
+  .reviewToolbar,
+  .runHeader {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

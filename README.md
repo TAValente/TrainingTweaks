@@ -178,13 +178,14 @@ If `APP_BASE_URL` is omitted, the app will try Vercel's system URL environment v
 ## Routes
 
 - `/` main chat UI
+- `/model-runs` model run review UI
 - `/api/strava/auth` redirects to Strava OAuth
 - `/api/strava/callback` exchanges the authorization code for tokens
 - `/api/strava/refresh` refreshes tokens if needed and imports recent activities
 - `/api/chat` builds structured running context and calls the AI
 - `/api/model-runs` returns or exports retained model run logs
 - `/api/state` returns local app state for the UI
-- `/login` authenticates the single TrainingTweaks user
+- `/login` authenticates configured TrainingTweaks users
 
 ## Internal Activity Model
 
