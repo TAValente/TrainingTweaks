@@ -276,6 +276,9 @@ export default function Home() {
           <h1>Adapt today&apos;s run without rewriting the whole plan.</h1>
         </div>
         <div className="actions">
+          <a className="button secondary" href="/model-runs">
+            Review Runs
+          </a>
           <a className="button secondary" href="/api/strava/auth">
             Connect Strava
           </a>
