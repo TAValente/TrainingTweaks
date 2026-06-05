@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  authenticateConfiguredUser,
   authCookieName,
   createSessionCookieValue,
   getAuthSecret,
@@ -18,13 +19,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => ({}))) as { password?: string };
-  if (body.password !== process.env.APP_PASSWORD) {
-    return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
+  const body = (await request.json().catch(() => ({}))) as { email?: string; password?: string };
+  const user = authenticateConfiguredUser(body.email, body.password);
+  if (!user) {
+    return NextResponse.json({ error: "Incorrect email or password." }, { status: 401 });
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(authCookieName, await createSessionCookieValue(secret), {
+  response.cookies.set(authCookieName, await createSessionCookieValue(secret, user), {
     httpOnly: true,
     maxAge: getSessionMaxAgeSeconds(),
     path: "/",

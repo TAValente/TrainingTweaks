@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authCookieName, getAuthSecret, verifySessionCookie } from "@/lib/auth";
+import { authCookieName, getAuthSecret, getSessionUserFromCookie } from "@/lib/auth";
 
 const publicPaths = new Set([
   "/login",
@@ -15,12 +15,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const isAuthenticated = await verifySessionCookie(
+  const user = await getSessionUserFromCookie(
     request.cookies.get(authCookieName)?.value,
     getAuthSecret()
   );
 
-  if (isAuthenticated) {
+  if (user) {
     return NextResponse.next();
   }
 
