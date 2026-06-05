@@ -91,6 +91,8 @@ Schema changes are tracked in [supabase/migrations](supabase/migrations). The cu
 
 Chat requests append model run records to the same app state, whether backed by local JSON or Supabase/Postgres JSONB. Each record stores the question, training context, structured running context, model, OpenAI request body, raw response, rendered answer, and model-call error details when applicable. The app keeps the latest 100 runs to prevent unbounded local state growth, and API keys or auth tokens are not stored in these records.
 
+Recent retained runs can be inspected with `GET /api/model-runs`; pass `?limit=10` to change the default response size. Use `GET /api/model-runs?export=json` to download all retained model runs as JSON for prompt review or eval set development.
+
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.
 
 If the connection URL is fussy, you can set separate Postgres variables instead. These take priority over `DATABASE_URL`:
@@ -162,6 +164,7 @@ If `APP_BASE_URL` is omitted, the app will try Vercel's system URL environment v
 - `/api/strava/callback` exchanges the authorization code for tokens
 - `/api/strava/refresh` refreshes tokens if needed and imports recent activities
 - `/api/chat` builds structured running context and calls the AI
+- `/api/model-runs` returns or exports retained model run logs
 - `/api/state` returns local app state for the UI
 - `/login` authenticates the single TrainingTweaks user
 
