@@ -69,13 +69,27 @@ STRAVA_CLIENT_SECRET=
 NEXTAUTH_SECRET=
 AUTH_SECRET=
 APP_PASSWORD=
+APP_USER_EMAIL=
+APP_USER_ID=
+APP_USERS_JSON=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 APP_BASE_URL=http://localhost:3000
 DATABASE_URL=
 ```
 
-`APP_PASSWORD` is the single-user login password. `AUTH_SECRET` signs the long-lived session cookie; `NEXTAUTH_SECRET` is used as a fallback if `AUTH_SECRET` is not set.
+`AUTH_SECRET` signs the long-lived session cookie; `NEXTAUTH_SECRET` is used as a fallback if `AUTH_SECRET` is not set.
+
+For the current single-user setup, set `APP_USER_EMAIL` and `APP_PASSWORD`. `APP_USER_ID` is optional; if omitted, the normalized email address is used as the stable user id.
+
+For multiple configured users, set `APP_USERS_JSON` instead:
+
+```json
+[
+  { "id": "runner-a", "email": "runner-a@example.com", "password": "strong-password-a" },
+  { "id": "runner-b", "email": "runner-b@example.com", "password": "strong-password-b" }
+]
+```
 
 The cookie lasts 180 days, so local and Vercel preview sessions stay signed in unless the browser cookie is cleared, the deployment host changes, or `AUTH_SECRET` changes.
 
@@ -83,9 +97,9 @@ This workspace also supports `local.env` for local-only secrets because the orig
 
 ## Supabase Storage
 
-For local laptop use, leaving `DATABASE_URL` blank stores data in `.data/trainingtweaks.json`.
+For local laptop use, leaving `DATABASE_URL` blank stores each user under `.data/users/<user-id>/trainingtweaks.json`.
 
-For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write.
+For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write. Each user gets a separate JSON app state row keyed as `user:<id>`.
 
 Schema changes are tracked in [supabase/migrations](supabase/migrations). The current migration creates the single JSON-backed app state table used by the MVP.
 

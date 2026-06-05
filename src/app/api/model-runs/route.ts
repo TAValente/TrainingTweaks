@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authCookieName, getRequestUser } from "@/lib/auth";
 import { redactModelRuns } from "@/lib/model-runs";
 import { getData } from "@/lib/store";
 
@@ -9,7 +10,10 @@ const maxLimit = 100;
 
 export async function GET(request: NextRequest) {
   try {
-    const data = await getData();
+    const user = await getRequestUser(request.cookies.get(authCookieName)?.value);
+    if (!user) return NextResponse.json({ error: "Login required." }, { status: 401 });
+
+    const data = await getData(user.id);
     const modelRuns = redactModelRuns(data.modelRuns ?? []);
     const exportAll = request.nextUrl.searchParams.get("export") === "json";
     const limit = parseLimit(request.nextUrl.searchParams.get("limit"));

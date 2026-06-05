@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
+import { authCookieName, getRequestUser } from "@/lib/auth";
 import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
+import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const data = await getData();
+    const user = await getRequestUser(request.cookies.get(authCookieName)?.value);
+    if (!user) return NextResponse.json({ error: "Login required." }, { status: 401 });
+
+    const data = await getData(user.id);
     return NextResponse.json({
+      user,
       connected: Boolean(data.strava),
       lastRefreshAt: data.lastRefreshAt,
       activities: data.activities.slice(0, 20),
