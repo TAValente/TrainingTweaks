@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { getDatabasePoolConfig } from "./database";
 import { redactModelRun } from "./model-runs";
-import type { AppData, Activity, StoredModelRun, StravaTokenSet, TrainingContext } from "./types";
+import type { AppData, Activity, ModelRunFeedback, StoredModelRun, StravaTokenSet, TrainingContext } from "./types";
 
 const maxStoredModelRuns = 100;
 let pool: Pool | undefined;
@@ -148,6 +148,20 @@ export async function appendModelRun(userId: string, modelRun: StoredModelRun) {
   const data = await readStore(userId);
   const modelRuns = [...(data.modelRuns ?? []), redactModelRun(modelRun)].slice(-maxStoredModelRuns);
   await writeStore(userId, { ...data, modelRuns });
+}
+
+export async function updateModelRunFeedback(userId: string, modelRunId: string, feedback: ModelRunFeedback) {
+  const data = await readStore(userId);
+  let updatedRun: StoredModelRun | undefined;
+  const modelRuns = (data.modelRuns ?? []).map((modelRun) => {
+    if (modelRun.id !== modelRunId) return modelRun;
+    updatedRun = redactModelRun({ ...modelRun, feedback });
+    return updatedRun;
+  });
+
+  if (!updatedRun) return undefined;
+  await writeStore(userId, { ...data, modelRuns });
+  return updatedRun;
 }
 
 function appStateIdForUser(userId: string) {

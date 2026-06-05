@@ -37,9 +37,10 @@ export async function POST(request: NextRequest) {
     const data = await getData(user.id);
     shouldLogModelRun = true;
     const modelCall = await askTrainingTweaks(data.activities, context, question);
+    const modelRunId = randomUUID();
 
-    await safeAppendModelRun(user.id, {
-      id: randomUUID(),
+    const persistedModelRun = await safeAppendModelRun(user.id, {
+      id: modelRunId,
       timestamp: new Date().toISOString(),
       question,
       trainingContext: context,
@@ -50,7 +51,10 @@ export async function POST(request: NextRequest) {
       renderedAnswer: modelCall.answer
     });
 
-    return NextResponse.json({ answer: modelCall.answer });
+    return NextResponse.json({
+      answer: modelCall.answer,
+      modelRunId: persistedModelRun ? modelRunId : undefined
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Chat request failed.";
     if (shouldLogModelRun && question && context && userId) {
@@ -78,7 +82,9 @@ export async function POST(request: NextRequest) {
 async function safeAppendModelRun(userId: string, modelRun: StoredModelRun) {
   try {
     await appendModelRun(userId, modelRun);
+    return true;
   } catch (error) {
     console.error("Could not persist model run.", error);
+    return false;
   }
 }
