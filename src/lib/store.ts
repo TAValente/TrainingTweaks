@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { getDatabasePoolConfig } from "./database";
+import { redactModelRun } from "./model-runs";
 import type { AppData, Activity, StoredModelRun, StravaTokenSet, TrainingContext } from "./types";
 
 const storePath = join(process.cwd(), ".data", "trainingtweaks.json");
@@ -146,7 +147,7 @@ export async function saveContext(context: TrainingContext) {
 
 export async function appendModelRun(modelRun: StoredModelRun) {
   const data = await readStore();
-  const modelRuns = [...(data.modelRuns ?? []), modelRun].slice(-maxStoredModelRuns);
+  const modelRuns = [...(data.modelRuns ?? []), redactModelRun(modelRun)].slice(-maxStoredModelRuns);
   await writeStore({ ...data, modelRuns });
 }
 
