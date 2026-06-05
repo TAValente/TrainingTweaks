@@ -58,6 +58,10 @@ export default function Home() {
   const [answerModelRunId, setAnswerModelRunId] = useState("");
   const [feedbackRating, setFeedbackRating] = useState<"positive" | "negative" | "">("");
   const [feedbackNote, setFeedbackNote] = useState("");
+  const [savedFeedbackRating, setSavedFeedbackRating] = useState<"positive" | "negative" | "">("");
+  const [savedFeedbackNote, setSavedFeedbackNote] = useState("");
+  const [feedbackSavedAt, setFeedbackSavedAt] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [status, setStatus] = useState("Loading local training context...");
   const [error, setError] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -181,6 +185,10 @@ export default function Home() {
     setAnswerModelRunId("");
     setFeedbackRating("");
     setFeedbackNote("");
+    setSavedFeedbackRating("");
+    setSavedFeedbackNote("");
+    setFeedbackSavedAt("");
+    setFeedbackMessage("");
 
     try {
       const response = await fetch("/api/chat", {
@@ -215,8 +223,12 @@ export default function Home() {
     window.location.assign("/login");
   }
 
-  async function saveFeedback(rating: "positive" | "negative") {
+  async function saveFeedback() {
     if (!answerModelRunId) return;
+    if (!feedbackRating) {
+      setFeedbackMessage("Choose Helpful or Not helpful before saving.");
+      return;
+    }
 
     setIsSavingFeedback(true);
     setError("");
@@ -227,14 +239,18 @@ export default function Home() {
         body: JSON.stringify({
           id: answerModelRunId,
           note: feedbackNote,
-          rating
+          rating: feedbackRating
         })
       });
       const payload = await parseJsonResponse(response);
       if (!response.ok) throw new Error(payload.error ?? "Feedback save failed.");
 
-      setFeedbackRating(rating);
-      setStatus("Feedback saved.");
+      setFeedbackRating(payload.feedback?.rating ?? feedbackRating);
+      setSavedFeedbackRating(payload.feedback?.rating ?? feedbackRating);
+      setSavedFeedbackNote(payload.feedback?.note ?? "");
+      setFeedbackSavedAt(payload.feedback?.updatedAt ?? new Date().toISOString());
+      setFeedbackMessage(payload.verified ? "Feedback captured and verified." : "Feedback saved.");
+      setStatus("Feedback captured.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Feedback save failed.";
       setError(message);
@@ -248,6 +264,9 @@ export default function Home() {
     () => state.activities.filter((activity) => activity.sportType.toLowerCase().includes("run")),
     [state.activities]
   );
+  const hasUnsavedFeedback =
+    Boolean(feedbackSavedAt) &&
+    (feedbackNote.trim() !== savedFeedbackNote || feedbackRating !== savedFeedbackRating);
 
   return (
     <main className="shell">
@@ -445,7 +464,10 @@ export default function Home() {
                       <button
                         className={feedbackRating === "positive" ? "miniButton" : "miniButton secondaryMini"}
                         disabled={isSavingFeedback}
-                        onClick={() => saveFeedback("positive")}
+                        onClick={() => {
+                          setFeedbackRating("positive");
+                          setFeedbackMessage("");
+                        }}
                         type="button"
                       >
                         Helpful
@@ -453,18 +475,42 @@ export default function Home() {
                       <button
                         className={feedbackRating === "negative" ? "miniButton" : "miniButton secondaryMini"}
                         disabled={isSavingFeedback}
-                        onClick={() => saveFeedback("negative")}
+                        onClick={() => {
+                          setFeedbackRating("negative");
+                          setFeedbackMessage("");
+                        }}
                         type="button"
                       >
                         Not helpful
                       </button>
+                      <button
+                        className="miniButton"
+                        disabled={isSavingFeedback || !feedbackRating}
+                        onClick={saveFeedback}
+                        type="button"
+                      >
+                        {isSavingFeedback ? "Saving..." : "Save feedback"}
+                      </button>
                     </div>
                     <textarea
                       className="feedbackNote"
-                      onChange={(event) => setFeedbackNote(event.target.value)}
-                      placeholder="Optional note for later review..."
+                      onChange={(event) => {
+                        setFeedbackNote(event.target.value);
+                        if (feedbackSavedAt) setFeedbackMessage("");
+                      }}
+                      placeholder="Optional commentary for later review..."
                       value={feedbackNote}
                     />
+                    {feedbackMessage || feedbackSavedAt ? (
+                      <p className="feedbackStatus">
+                        {feedbackMessage || "Feedback captured."}
+                        {feedbackSavedAt ? ` Last saved ${new Date(feedbackSavedAt).toLocaleString()}.` : ""}
+                        {savedFeedbackNote ? ` Commentary: "${savedFeedbackNote}"` : ""}
+                        {hasUnsavedFeedback ? " You have unsaved feedback changes." : ""}
+                      </p>
+                    ) : (
+                      <p className="feedbackStatus muted">Choose a rating, add optional commentary, then save feedback.</p>
+                    )}
                   </section>
                 ) : null}
               </>

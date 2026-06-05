@@ -161,7 +161,18 @@ export async function updateModelRunFeedback(userId: string, modelRunId: string,
 
   if (!updatedRun) return undefined;
   await writeStore(userId, { ...data, modelRuns });
-  return updatedRun;
+
+  const verificationData = await readStore(userId);
+  const verifiedRun = verificationData.modelRuns?.find((modelRun) => modelRun.id === modelRunId);
+  if (
+    verifiedRun?.feedback?.rating !== feedback.rating ||
+    verifiedRun.feedback.note !== feedback.note ||
+    verifiedRun.feedback.updatedAt !== feedback.updatedAt
+  ) {
+    throw new Error("Model run feedback was not persisted.");
+  }
+
+  return verifiedRun;
 }
 
 function appStateIdForUser(userId: string) {
