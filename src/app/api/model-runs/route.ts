@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest) {
     const modelRun = await updateModelRunFeedback(user.id, body.id, feedback);
 
     if (!modelRun) return NextResponse.json({ error: "Model run was not found." }, { status: 404 });
-    return NextResponse.json({ feedback: modelRun.feedback });
+    return NextResponse.json({ feedback: modelRun.feedback, verified: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save model run feedback.";
     return NextResponse.json({ error: message }, { status: 500 });
