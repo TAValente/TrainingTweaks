@@ -118,3 +118,25 @@ Adoption criteria:
 - the workflow preserves the product principle that the runner decides
 
 Default posture: keep the chat path as a simple deterministic context builder plus one model judgment call until evidence justifies agent orchestration.
+
+## 8. Self-Service Authentication
+
+Move beyond configured environment-variable users when TrainingTweaks is ready for broader use.
+
+Scope:
+
+- user signup and login
+- password reset or magic-link recovery
+- email verification
+- per-user app state ownership
+- account deletion and data deletion
+- abuse controls so public signup cannot unexpectedly spend OpenAI or Strava API quota
+- clear separation between authenticated users and admin-only operations
+
+Likely path:
+
+- prefer Supabase Auth or another mature auth provider over hand-rolled password storage
+- keep the existing `user:<id>` app state keying as the storage boundary
+- migrate configured users to provider-backed users once the auth provider is in place
+
+Default posture: keep configured email/password users for the private MVP, but do not treat them as the long-term account system.
