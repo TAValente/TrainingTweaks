@@ -64,6 +64,74 @@ export type JsonValue =
 
 export type JsonObject = { [key: string]: JsonValue };
 
+export type RiskCategory =
+  | "load"
+  | "long_run"
+  | "intensity"
+  | "recovery"
+  | "novelty"
+  | "consistency"
+  | "data_quality";
+
+export type RiskSeverity = "info" | "green" | "yellow" | "red";
+
+export type RiskConfidence = "high" | "medium" | "low" | "exploratory";
+
+export type RiskFinding = {
+  id: string;
+  ruleId: string;
+  category: RiskCategory;
+  severity: RiskSeverity;
+  confidence: RiskConfidence;
+  title: string;
+  message: string;
+  observedValue?: number;
+  thresholdValue?: number;
+  unit?: string;
+  lookbackDays: number;
+  evidence: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type RiskRuleThresholds = {
+  green?: number;
+  yellow?: number;
+  red?: number;
+  [key: string]: number | undefined;
+};
+
+export type RiskRuleConfig = {
+  enabled: boolean;
+  includeGreen?: boolean;
+  lookbackDays?: number;
+  baselineDays?: number;
+  minActivities?: number;
+  minMileage?: number;
+  severities?: Record<string, RiskSeverity>;
+  thresholds: RiskRuleThresholds;
+  confidence: RiskConfidence;
+};
+
+export type RiskEngineConfig = {
+  version: string;
+  rules: {
+    weeklyVolumeGrowth: RiskRuleConfig;
+    acwrMileage: RiskRuleConfig;
+    consecutiveBuildWeeks: RiskRuleConfig;
+    longRunPercentage: RiskRuleConfig;
+    longRunJump: RiskRuleConfig;
+    hardSessionCount: RiskRuleConfig;
+    intensitySpike: RiskRuleConfig;
+    hardDayClustering: RiskRuleConfig;
+    consecutiveRunningDays: RiskRuleConfig;
+    trainingNovelty: RiskRuleConfig;
+    dataQuality: RiskRuleConfig;
+  };
+  hardRunClassification: RiskRuleConfig & {
+    nameKeywords: string[];
+  };
+};
+
 export type StoredModelRun = {
   id: string;
   timestamp: string;

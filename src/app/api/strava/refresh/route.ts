@@ -7,6 +7,7 @@ import {
 } from "@/lib/strava";
 import { getData, saveActivities, saveStravaTokens } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
+import { computeRiskFindings } from "@/lib/risk";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
     detailedRunRemainingThisBatch: detailSync.remainingCount,
     totalCount: activities.length,
     activities: activities.slice(0, 20),
-    summary: buildActivitySummary(activities)
+    summary: buildActivitySummary(activities),
+    riskFindings: computeRiskFindings({ activities })
   });
 }

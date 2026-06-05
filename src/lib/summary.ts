@@ -1,4 +1,5 @@
 import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
+import { computeRiskFindings } from "./risk";
 
 const metersPerMile = 1609.344;
 const defaultTimeZone = "America/New_York";
@@ -69,6 +70,7 @@ export function contextForPrompt(
   const now = new Date();
   const timeZone = defaultTimeZone;
   const summary = buildActivitySummary(activities, now);
+  const riskFindings = computeRiskFindings({ activities, asOfDate: now });
   const today = localDateParts(now, timeZone);
   const recentRuns = activities
     .filter(isRun)
@@ -117,6 +119,7 @@ export function contextForPrompt(
       note: "Use todayLocalDate, todayDayOfWeek, and daysAgo values for schedule reasoning."
     },
     summary,
+    riskFindings,
     selectedTrainingPlan: {
       source: context.planSource || "unknown",
       variant: context.planVariant || "Not provided"
