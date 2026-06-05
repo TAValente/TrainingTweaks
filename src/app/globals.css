@@ -372,6 +372,13 @@ input:disabled {
   min-height: 76px;
 }
 
+.feedbackStatus {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
 .reviewToolbar {
   align-items: end;
   display: flex;

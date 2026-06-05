@@ -109,7 +109,7 @@ Schema changes are tracked in [supabase/migrations](supabase/migrations). The cu
 
 Chat requests append model run records to the same app state, whether backed by local JSON or Supabase/Postgres JSONB. Each record stores the question, training context, structured running context, model, OpenAI request body, raw response, rendered answer, model-call error details when applicable, and optional user feedback. The app keeps the latest 100 runs to prevent unbounded local state growth, and API keys or auth tokens are not stored in these records.
 
-Recent retained runs can be inspected with `GET /api/model-runs`; pass `?limit=10` to change the default response size. Use `GET /api/model-runs?export=json` to download all retained model runs as JSON for prompt review or eval set development. Use `PATCH /api/model-runs` with a model run id, `positive` or `negative` rating, and optional note to save feedback.
+Recent retained runs can be inspected with `GET /api/model-runs`; pass `?limit=10` to change the default response size. Use `GET /api/model-runs?export=json` to download all retained model runs as JSON for prompt review or eval set development. Use `PATCH /api/model-runs` with a model run id, `positive` or `negative` rating, and optional note to save feedback. Feedback writes are verified by reading the retained run back after persistence.
 
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.
 
