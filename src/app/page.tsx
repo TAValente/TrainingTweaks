@@ -55,11 +55,15 @@ export default function Home() {
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [answerModelRunId, setAnswerModelRunId] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState<"positive" | "negative" | "">("");
+  const [feedbackNote, setFeedbackNote] = useState("");
   const [status, setStatus] = useState("Loading local training context...");
   const [error, setError] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [isSavingContext, setIsSavingContext] = useState(false);
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -174,6 +178,9 @@ export default function Home() {
     setStatus("Reasoning through the training decision...");
     setError("");
     setAnswer("");
+    setAnswerModelRunId("");
+    setFeedbackRating("");
+    setFeedbackNote("");
 
     try {
       const response = await fetch("/api/chat", {
@@ -192,6 +199,7 @@ export default function Home() {
       if (!response.ok) throw new Error(payload.error ?? "Chat request failed.");
 
       setAnswer(payload.answer);
+      setAnswerModelRunId(payload.modelRunId ?? "");
       setStatus("Answer ready.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Chat request failed.";
@@ -205,6 +213,35 @@ export default function Home() {
   async function logOut() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.assign("/login");
+  }
+
+  async function saveFeedback(rating: "positive" | "negative") {
+    if (!answerModelRunId) return;
+
+    setIsSavingFeedback(true);
+    setError("");
+    try {
+      const response = await fetch("/api/model-runs", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: answerModelRunId,
+          note: feedbackNote,
+          rating
+        })
+      });
+      const payload = await parseJsonResponse(response);
+      if (!response.ok) throw new Error(payload.error ?? "Feedback save failed.");
+
+      setFeedbackRating(rating);
+      setStatus("Feedback saved.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Feedback save failed.";
+      setError(message);
+      setStatus("Feedback save failed.");
+    } finally {
+      setIsSavingFeedback(false);
+    }
   }
 
   const runs = useMemo(
@@ -400,7 +437,37 @@ export default function Home() {
 
           <article className="answer">
             {answer ? (
-              <Markdownish text={answer} />
+              <>
+                <Markdownish text={answer} />
+                {answerModelRunId ? (
+                  <section className="feedback">
+                    <div className="feedbackActions">
+                      <button
+                        className={feedbackRating === "positive" ? "miniButton" : "miniButton secondaryMini"}
+                        disabled={isSavingFeedback}
+                        onClick={() => saveFeedback("positive")}
+                        type="button"
+                      >
+                        Helpful
+                      </button>
+                      <button
+                        className={feedbackRating === "negative" ? "miniButton" : "miniButton secondaryMini"}
+                        disabled={isSavingFeedback}
+                        onClick={() => saveFeedback("negative")}
+                        type="button"
+                      >
+                        Not helpful
+                      </button>
+                    </div>
+                    <textarea
+                      className="feedbackNote"
+                      onChange={(event) => setFeedbackNote(event.target.value)}
+                      placeholder="Optional note for later review..."
+                      value={feedbackNote}
+                    />
+                  </section>
+                ) : null}
+              </>
             ) : (
               <p className="muted">
                 Answers will prioritize the timing, the practical recommendation, and the key tradeoff.

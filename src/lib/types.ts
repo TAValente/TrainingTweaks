@@ -79,6 +79,13 @@ export type StoredModelRun = {
     status?: number;
     rawResponse?: JsonValue | string;
   };
+  feedback?: ModelRunFeedback;
+};
+
+export type ModelRunFeedback = {
+  rating: "positive" | "negative";
+  note?: string;
+  updatedAt: string;
 };
 
 export type AppData = {
