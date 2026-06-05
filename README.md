@@ -21,7 +21,7 @@ Key engineering rule: deterministic systems should calculate facts and risk sign
 ## MVP
 
 - Connect Strava locally with OAuth.
-- Store Strava access and refresh tokens in a local JSON file.
+- Store Strava access and refresh tokens in per-user JSON app state.
 - Refresh recent Strava activities.
 - Normalize activities into a provider-neutral internal model.
 - Pull up to five years of Strava activity history.
@@ -29,7 +29,7 @@ Key engineering rule: deterministic systems should calculate facts and risk sign
 - Show a compact recent activity summary.
 - Select a known plan family such as Hal Higdon, Jack Daniels, Pfitzinger, Hansons, NRC, FIRST, McMillan, generic, or custom.
 - Paste optional plan, goal, and subjective context.
-- Require a single-user password before exposing the app or API routes.
+- Require configured user login before exposing the app or API routes.
 - Ask a running adaptation question in chat.
 - Receive a direct recommendation grounded in doctrine, context, recent training, and the user's current constraints.
 - Persist recent model runs for later prompt review and evaluation.
@@ -42,8 +42,9 @@ TrainingTweaks is a personal decision-support tool. It does not provide medical 
 
 - Next.js App Router
 - TypeScript
-- Local JSON file storage in `.data/trainingtweaks.json`
+- Per-user JSON app state
 - Supabase/Postgres storage when `DATABASE_URL` is configured
+- Local JSON storage fallback for development when no database is configured
 - Strava API
 - OpenAI Responses API
 
@@ -95,11 +96,13 @@ The cookie lasts 180 days, so local and Vercel preview sessions stay signed in u
 
 This workspace also supports `local.env` for local-only secrets because the original project used that filename.
 
-## Supabase Storage
+## App State Storage
 
-For local laptop use, leaving `DATABASE_URL` blank stores each user under `.data/users/<user-id>/trainingtweaks.json`.
+TrainingTweaks stores tokens, activities, saved context, and model run logs in per-user JSON app state.
 
 For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write. Each user gets a separate JSON app state row keyed as `user:<id>`.
+
+If no database is configured, the app falls back to local JSON files under `.data/users/<user-id>/trainingtweaks.json`. This is intended for local development, not production persistence.
 
 Schema changes are tracked in [supabase/migrations](supabase/migrations). The current migration creates the single JSON-backed app state table used by the MVP.
 
@@ -123,7 +126,7 @@ POSTGRES_PASSWORD=
 
 ## Vercel Auth and Preview
 
-Set `APP_PASSWORD` and `AUTH_SECRET` in both Production and Preview environments. Use the same Supabase/Postgres environment variables in Preview if you want preview deployments to read and write the same saved Strava data, plan context, goals, and chat context.
+Set `APP_USER_EMAIL`, `APP_PASSWORD`, and `AUTH_SECRET` in both Production and Preview environments. Use the same Supabase/Postgres environment variables in Preview if you want preview deployments to read and write the same saved Strava data, plan context, goals, and chat context.
 
 You can generate a local secret in PowerShell:
 
