@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nextPath, setNextPath] = useState("/");
   const [status, setStatus] = useState("");
@@ -25,7 +26,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ email, password })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error ?? "Login failed.");
@@ -44,14 +45,23 @@ export default function LoginPage() {
         <p className="eyebrow">TrainingTweaks</p>
         <h1>Private training log access</h1>
         <p className="loginCopy">
-          Enter the app password to use your Strava connection, saved context, and training memory.
+          Log in to use your Strava connection, saved context, and training memory.
         </p>
         <form className="loginForm" onSubmit={logIn}>
+          <label>
+            <span>Email</span>
+            <input
+              autoComplete="email"
+              autoFocus
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              value={email}
+            />
+          </label>
           <label>
             <span>Password</span>
             <input
               autoComplete="current-password"
-              autoFocus
               onChange={(event) => setPassword(event.target.value)}
               type="password"
               value={password}

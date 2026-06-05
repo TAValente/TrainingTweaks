@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { authCookieName, getRequestUser } from "@/lib/auth";
 import { exchangeCodeForTokens } from "@/lib/strava";
 import { saveStravaTokens } from "@/lib/store";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  const user = await getRequestUser(request.cookies.get(authCookieName)?.value);
+  if (!user) return redirectWithStravaError(request, "Login required.");
+
   const code = request.nextUrl.searchParams.get("code");
   const error = request.nextUrl.searchParams.get("error");
 
@@ -18,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    await saveStravaTokens(tokens);
+    await saveStravaTokens(user.id, tokens);
   } catch (error) {
     return redirectWithStravaError(request, stravaCallbackErrorMessage(error));
   }

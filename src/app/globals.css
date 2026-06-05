@@ -354,6 +354,24 @@ input:disabled {
   line-height: 1.6;
 }
 
+.feedback {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+.feedbackActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feedbackNote {
+  min-height: 76px;
+}
+
 .loginShell {
   min-height: 100svh;
   display: grid;

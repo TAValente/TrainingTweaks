@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOptionalEnv, getRequiredEnv } from "./env";
 import { contextForPrompt } from "./summary";
-import type { Activity, TrainingContext } from "./types";
+import type { Activity, JsonObject, JsonValue, TrainingContext } from "./types";
 
 type OpenAIResponse = {
   output_text?: string;
@@ -10,6 +10,48 @@ type OpenAIResponse = {
     content?: Array<{ type?: string; text?: string }>;
   }>;
 };
+
+type OpenAIRequestBody = JsonObject & {
+  model: string;
+  input: Array<{ role: "system" | "user"; content: string }>;
+  max_output_tokens: number;
+  temperature: number;
+};
+
+export type TrainingTweaksModelCall = {
+  model: string;
+  runningContext: JsonValue;
+  openAIRequest: OpenAIRequestBody;
+  rawModelResponse: JsonValue;
+  answer: string;
+};
+
+export class TrainingTweaksModelError extends Error {
+  status?: number;
+  model?: string;
+  runningContext?: JsonValue;
+  openAIRequest?: OpenAIRequestBody;
+  rawModelResponse?: JsonValue | string;
+
+  constructor(
+    message: string,
+    details: {
+      status?: number;
+      model?: string;
+      runningContext?: JsonValue;
+      openAIRequest?: OpenAIRequestBody;
+      rawModelResponse?: JsonValue | string;
+    } = {}
+  ) {
+    super(message);
+    this.name = "TrainingTweaksModelError";
+    this.status = details.status;
+    this.model = details.model;
+    this.runningContext = details.runningContext;
+    this.openAIRequest = details.openAIRequest;
+    this.rawModelResponse = details.rawModelResponse;
+  }
+}
 
 const productGuidance = `You are TrainingTweaks, a running decision assistant for a self-coached runner.
 
@@ -27,35 +69,77 @@ export async function askTrainingTweaks(
   activities: Activity[],
   trainingContext: TrainingContext,
   question: string
-) {
+): Promise<TrainingTweaksModelCall> {
   const apiKey = getRequiredEnv("OPENAI_API_KEY");
-  const model = getOptionalEnv("OPENAI_MODEL", "gpt-4.1-mini");
-  const runningContext = contextForPrompt(activities, trainingContext, question);
+  const model = getOptionalEnv("OPENAI_MODEL", "gpt-4.1-mini") ?? "gpt-4.1-mini";
+  const runningContext = toJsonValue(contextForPrompt(activities, trainingContext, question));
   const userContent = buildUserContent(trainingContext, question, runningContext);
+  const openAIRequest: OpenAIRequestBody = {
+    model,
+    input: [
+      { role: "system", content: productGuidance },
+      { role: "user", content: userContent }
+    ],
+    max_output_tokens: 500,
+    temperature: 0.3
+  };
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        { role: "system", content: productGuidance },
-        { role: "user", content: userContent }
-      ],
-      max_output_tokens: 500,
-      temperature: 0.3
-    })
-  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(openAIRequest)
+    });
+  } catch (error) {
+    throw new TrainingTweaksModelError(
+      error instanceof Error ? error.message : "OpenAI request failed before a response was returned.",
+      {
+        model,
+        runningContext,
+        openAIRequest
+      }
+    );
+  }
 
   if (!response.ok) {
-    throw new Error(`OpenAI request failed: ${response.status} ${await response.text()}`);
+    const rawResponse = await response.text();
+    throw new TrainingTweaksModelError(`OpenAI request failed: ${response.status} ${rawResponse}`, {
+      status: response.status,
+      model,
+      runningContext,
+      openAIRequest,
+      rawModelResponse: rawResponse
+    });
   }
 
   const payload = (await response.json()) as OpenAIResponse;
-  return extractText(payload);
+  try {
+    return {
+      model,
+      runningContext,
+      openAIRequest,
+      rawModelResponse: toJsonValue(payload),
+      answer: extractText(payload)
+    };
+  } catch (error) {
+    throw new TrainingTweaksModelError(
+      error instanceof Error ? error.message : "OpenAI response could not be rendered.",
+      {
+        model,
+        runningContext,
+        openAIRequest,
+        rawModelResponse: toJsonValue(payload)
+      }
+    );
+  }
+}
+
+function toJsonValue(value: unknown) {
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
 function buildUserContent(

@@ -2,16 +2,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { getDatabasePoolConfig } from "./database";
-import type { AppData, Activity, StravaTokenSet, TrainingContext } from "./types";
+import { redactModelRun } from "./model-runs";
+import type { AppData, Activity, ModelRunFeedback, StoredModelRun, StravaTokenSet, TrainingContext } from "./types";
 
-const storePath = join(process.cwd(), ".data", "trainingtweaks.json");
-const appStateId = "default";
+const maxStoredModelRuns = 100;
 let pool: Pool | undefined;
 let schemaReady: Promise<void> | undefined;
 
 function emptyData(): AppData {
   return {
-    activities: []
+    activities: [],
+    modelRuns: []
   };
 }
 
@@ -38,34 +39,36 @@ async function ensureSchema() {
   await schemaReady;
 }
 
-async function readStore(): Promise<AppData> {
+async function readStore(userId: string): Promise<AppData> {
   const database = getPool();
-  if (database) return readDatabaseStore(database);
-  return readFileStore();
+  if (database) return readDatabaseStore(database, userId);
+  return readFileStore(userId);
 }
 
-async function readDatabaseStore(database: Pool): Promise<AppData> {
+async function readDatabaseStore(database: Pool, userId: string): Promise<AppData> {
   await ensureSchema();
   const result = await database.query<{ data: AppData }>(
     "select data from trainingtweaks_app_state where id = $1",
-    [appStateId]
+    [appStateIdForUser(userId)]
   );
   const data = result.rows[0]?.data;
   return {
     ...emptyData(),
     ...data,
-    activities: data?.activities ?? []
+    activities: data?.activities ?? [],
+    modelRuns: data?.modelRuns ?? []
   };
 }
 
-async function readFileStore(): Promise<AppData> {
+async function readFileStore(userId: string): Promise<AppData> {
   try {
-    const raw = await readFile(storePath, "utf8");
+    const raw = await readFile(storePathForUser(userId), "utf8");
     const parsed = JSON.parse(raw) as AppData;
     return {
       ...emptyData(),
       ...parsed,
-      activities: parsed.activities ?? []
+      activities: parsed.activities ?? [],
+      modelRuns: parsed.modelRuns ?? []
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -74,17 +77,17 @@ async function readFileStore(): Promise<AppData> {
   }
 }
 
-async function writeStore(data: AppData) {
+async function writeStore(userId: string, data: AppData) {
   const database = getPool();
   if (database) {
-    await writeDatabaseStore(database, data);
+    await writeDatabaseStore(database, userId, data);
     return;
   }
 
-  await writeFileStore(data);
+  await writeFileStore(userId, data);
 }
 
-async function writeDatabaseStore(database: Pool, data: AppData) {
+async function writeDatabaseStore(database: Pool, userId: string, data: AppData) {
   await ensureSchema();
   await database.query(
     `
@@ -93,26 +96,27 @@ async function writeDatabaseStore(database: Pool, data: AppData) {
       on conflict (id)
       do update set data = excluded.data, updated_at = now()
     `,
-    [appStateId, JSON.stringify(data)]
+    [appStateIdForUser(userId), JSON.stringify(data)]
   );
 }
 
-async function writeFileStore(data: AppData) {
-  await mkdir(dirname(storePath), { recursive: true });
-  await writeFile(storePath, JSON.stringify(data, null, 2), "utf8");
+async function writeFileStore(userId: string, data: AppData) {
+  const path = storePathForUser(userId);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(data, null, 2), "utf8");
 }
 
-export async function getData() {
-  return readStore();
+export async function getData(userId: string) {
+  return readStore(userId);
 }
 
-export async function saveStravaTokens(tokens: StravaTokenSet) {
-  const data = await readStore();
-  await writeStore({ ...data, strava: tokens });
+export async function saveStravaTokens(userId: string, tokens: StravaTokenSet) {
+  const data = await readStore(userId);
+  await writeStore(userId, { ...data, strava: tokens });
 }
 
-export async function saveActivities(activities: Activity[]) {
-  const data = await readStore();
+export async function saveActivities(userId: string, activities: Activity[]) {
+  const data = await readStore(userId);
   const merged = new Map<string, Activity>();
   for (const activity of data.activities) {
     merged.set(`${activity.provider}:${activity.providerActivityId}`, activity);
@@ -127,7 +131,7 @@ export async function saveActivities(activities: Activity[]) {
     (a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
   );
 
-  await writeStore({
+  await writeStore(userId, {
     ...data,
     activities: sorted,
     lastRefreshAt: new Date().toISOString()
@@ -135,9 +139,37 @@ export async function saveActivities(activities: Activity[]) {
   return sorted;
 }
 
-export async function saveContext(context: TrainingContext) {
-  const data = await readStore();
-  await writeStore({ ...data, context });
+export async function saveContext(userId: string, context: TrainingContext) {
+  const data = await readStore(userId);
+  await writeStore(userId, { ...data, context });
+}
+
+export async function appendModelRun(userId: string, modelRun: StoredModelRun) {
+  const data = await readStore(userId);
+  const modelRuns = [...(data.modelRuns ?? []), redactModelRun(modelRun)].slice(-maxStoredModelRuns);
+  await writeStore(userId, { ...data, modelRuns });
+}
+
+export async function updateModelRunFeedback(userId: string, modelRunId: string, feedback: ModelRunFeedback) {
+  const data = await readStore(userId);
+  let updatedRun: StoredModelRun | undefined;
+  const modelRuns = (data.modelRuns ?? []).map((modelRun) => {
+    if (modelRun.id !== modelRunId) return modelRun;
+    updatedRun = redactModelRun({ ...modelRun, feedback });
+    return updatedRun;
+  });
+
+  if (!updatedRun) return undefined;
+  await writeStore(userId, { ...data, modelRuns });
+  return updatedRun;
+}
+
+function appStateIdForUser(userId: string) {
+  return `user:${userId}`;
+}
+
+function storePathForUser(userId: string) {
+  return join(process.cwd(), ".data", "users", encodeURIComponent(userId), "trainingtweaks.json");
 }
 
 function mergeActivity(existing: Activity | undefined, next: Activity): Activity {

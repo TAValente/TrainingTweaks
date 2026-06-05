@@ -97,3 +97,24 @@ Candidates:
 - future Garmin or other provider integrations
 
 These should be added only when they improve decisions enough to justify the extra complexity.
+
+## 7. Managed Agent Workflow Consideration
+
+Consider a managed agent or Agents SDK workflow only after logged model runs and feedback reveal failure modes that a single model call cannot reliably handle.
+
+Potential uses:
+
+- separate deterministic risk checking from final recommendation drafting
+- add a review or guardrail step for injury, fatigue, or excessive-load recommendations
+- orchestrate tools for weather, calendar, plan parsing, or post-run outcome checks
+- produce traceable intermediate decisions for evals and debugging
+- support human review gates before higher-risk advice patterns
+
+Adoption criteria:
+
+- the added steps measurably improve recommendation quality or safety
+- eval data shows repeated failures from the current single-call architecture
+- cost, latency, and operational complexity are justified by better decisions
+- the workflow preserves the product principle that the runner decides
+
+Default posture: keep the chat path as a simple deterministic context builder plus one model judgment call until evidence justifies agent orchestration.

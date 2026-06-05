@@ -54,10 +54,45 @@ export type TrainingPlanSource =
   | "other_named"
   | "custom";
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | JsonObject;
+
+export type JsonObject = { [key: string]: JsonValue };
+
+export type StoredModelRun = {
+  id: string;
+  timestamp: string;
+  question: string;
+  trainingContext: TrainingContext;
+  runningContext?: JsonValue;
+  model?: string;
+  openAIRequest?: JsonValue;
+  rawModelResponse?: JsonValue | string;
+  renderedAnswer?: string;
+  error?: {
+    message: string;
+    status?: number;
+    rawResponse?: JsonValue | string;
+  };
+  feedback?: ModelRunFeedback;
+};
+
+export type ModelRunFeedback = {
+  rating: "positive" | "negative";
+  note?: string;
+  updatedAt: string;
+};
+
 export type AppData = {
   strava?: StravaTokenSet;
   activities: Activity[];
   context?: TrainingContext;
+  modelRuns?: StoredModelRun[];
   lastRefreshAt?: string;
 };
 
