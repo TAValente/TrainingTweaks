@@ -71,7 +71,7 @@ export async function askTrainingTweaks(
   question: string
 ): Promise<TrainingTweaksModelCall> {
   const apiKey = getRequiredEnv("OPENAI_API_KEY");
-  const model = getOptionalEnv("OPENAI_MODEL", "gpt-4.1-mini");
+  const model = getOptionalEnv("OPENAI_MODEL", "gpt-4.1-mini") ?? "gpt-4.1-mini";
   const runningContext = toJsonValue(contextForPrompt(activities, trainingContext, question));
   const userContent = buildUserContent(trainingContext, question, runningContext);
   const openAIRequest: OpenAIRequestBody = {
