@@ -1,13 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { buildStarterMarathonPlan, type MarathonPlanRiskTolerance } from "@/lib/marathon-plan";
+import { structuredPlanSummary } from "@/lib/structured-plans";
 import { trainingPlanProfiles } from "@/lib/training-plans";
 import type {
   Activity,
   ActivitySummary,
   RiskFinding,
   RiskSeverity,
+  StructuredTrainingPlan,
   TrainingContext,
+  TrainingPlanDayOfWeek,
+  TrainingPlanWeek,
   TrainingPlanSource
 } from "@/lib/types";
 
@@ -21,6 +26,7 @@ type AppState = {
 };
 
 type TrainingStatus = "de-training" | "productive" | "risky" | "high-risk";
+type AppTab = "today" | "plan";
 
 const emptySummary: ActivitySummary = {
   mileageLast7Days: 0,
@@ -47,6 +53,8 @@ const emptySummary: ActivitySummary = {
 };
 
 const statusScale: TrainingStatus[] = ["de-training", "productive", "risky", "high-risk"];
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
+const dayOrder: TrainingPlanDayOfWeek[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
 const dashboardGroups = [
   {
@@ -92,6 +100,14 @@ export default function Home() {
   const [savedPlanSource, setSavedPlanSource] = useState<TrainingPlanSource>("unknown");
   const [savedPlanVariant, setSavedPlanVariant] = useState("");
   const [savedPlanContext, setSavedPlanContext] = useState("");
+  const [savedStructuredPlan, setSavedStructuredPlan] = useState<StructuredTrainingPlan | undefined>();
+  const [starterCurrentMileage, setStarterCurrentMileage] = useState(0);
+  const [starterTargetMileage, setStarterTargetMileage] = useState(40);
+  const [starterPlanWeeks, setStarterPlanWeeks] = useState(16);
+  const [starterRiskTolerance, setStarterRiskTolerance] = useState<MarathonPlanRiskTolerance>("regular");
+  const [starterStartDate, setStarterStartDate] = useState(nextMondayIsoDate());
+  const [selectedPlanWeek, setSelectedPlanWeek] = useState(1);
+  const [activeTab, setActiveTab] = useState<AppTab>("today");
   const [savedGoalsContext, setSavedGoalsContext] = useState("");
   const [isEditingPlan, setIsEditingPlan] = useState(false);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
@@ -142,13 +158,19 @@ export default function Home() {
     const nextPlanVariant = nextState.context?.planVariant ?? "";
     const nextPlanContext = nextState.context?.planContext ?? "";
     const nextGoalsContext = nextState.context?.goalsContext ?? "";
+    const currentMileageEstimate = estimateCurrentMilesPerWeek(nextState.summary);
     setPlanSource(nextPlanSource);
     setPlanVariant(nextPlanVariant);
     setPlanContext(nextPlanContext);
+    setStarterCurrentMileage(currentMileageEstimate);
+    setStarterTargetMileage(Math.max(currentMileageEstimate, peakPlanMileage(nextState.context?.structuredPlan) ?? 40));
+    setStarterStartDate(nextState.context?.structuredPlan?.startDate ?? nextMondayIsoDate());
+    setSelectedPlanWeek(currentCalendarWeek(nextState.context?.structuredPlan));
     setGoalsContext(nextGoalsContext);
     setSavedPlanSource(nextPlanSource);
     setSavedPlanVariant(nextPlanVariant);
     setSavedPlanContext(nextPlanContext);
+    setSavedStructuredPlan(nextState.context?.structuredPlan);
     setSavedGoalsContext(nextGoalsContext);
     setSubjectiveContext(nextState.context?.subjectiveContext ?? "");
     setStatus(nextState.connected ? "Strava connected." : "Connect Strava to refresh activities.");
@@ -171,6 +193,9 @@ export default function Home() {
         summary: payload.summary,
         riskFindings: payload.riskFindings
       }));
+      const currentMileageEstimate = estimateCurrentMilesPerWeek(payload.summary);
+      setStarterCurrentMileage(currentMileageEstimate);
+      setStarterTargetMileage((current) => Math.max(current, currentMileageEstimate));
       setStatus(`Imported ${payload.importedCount} recent Strava activities.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Refresh failed.";
@@ -194,6 +219,7 @@ export default function Home() {
           planSource,
           planVariant,
           planContext,
+          structuredPlan: state.context?.structuredPlan,
           goalsContext,
           subjectiveContext
         })
@@ -204,6 +230,7 @@ export default function Home() {
       setSavedPlanSource(planSource);
       setSavedPlanVariant(planVariant);
       setSavedPlanContext(planContext);
+      setSavedStructuredPlan(state.context?.structuredPlan);
       setSavedGoalsContext(goalsContext);
       if (kind === "plan") setIsEditingPlan(false);
       if (kind === "goals") setIsEditingGoals(false);
@@ -241,6 +268,7 @@ export default function Home() {
           planContext,
           planSource,
           planVariant,
+          structuredPlan: state.context?.structuredPlan,
           goalsContext,
           subjectiveContext,
           question
@@ -264,6 +292,27 @@ export default function Home() {
   async function logOut() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.assign("/login");
+  }
+
+  function generateStarterMarathonPlan() {
+    const structuredPlan = buildStarterMarathonPlan({
+      currentMilesPerWeek: starterCurrentMileage,
+      targetMilesPerWeek: starterTargetMileage,
+      durationWeeks: starterPlanWeeks,
+      riskTolerance: starterRiskTolerance,
+      startDate: starterStartDate
+    });
+    setState((current) => ({
+      ...current,
+      context: {
+        ...current.context,
+        structuredPlan
+      }
+    }));
+    setPlanSource("custom");
+    setPlanVariant("TrainingTweaks generic marathon");
+    setSelectedPlanWeek(currentCalendarWeek(structuredPlan));
+    setStatus("Starter marathon plan generated. Save plan context to persist it.");
   }
 
   async function saveFeedback() {
@@ -311,6 +360,7 @@ export default function Home() {
     Boolean(feedbackSavedAt) &&
     (feedbackNote.trim() !== savedFeedbackNote || feedbackRating !== savedFeedbackRating);
   const dashboard = buildDashboardGroups(state.riskFindings ?? [], state.summary);
+  const visibleStructuredPlan = state.context?.structuredPlan;
 
   return (
     <main className="appShell">
@@ -320,9 +370,12 @@ export default function Home() {
           <h1>Decision cockpit</h1>
         </div>
         <nav>
-          <a className="active" href="/">
+          <button className={activeTab === "today" ? "active" : ""} onClick={() => setActiveTab("today")} type="button">
             Today
-          </a>
+          </button>
+          <button className={activeTab === "plan" ? "active" : ""} onClick={() => setActiveTab("plan")} type="button">
+            Plan
+          </button>
           <a href="/model-runs">Model review</a>
         </nav>
         <div className="navActions">
@@ -386,66 +439,10 @@ export default function Home() {
         </section>
         {error ? <section className="errorLine">{error}</section> : null}
 
+        {activeTab === "today" ? (
         <section className="coreGrid">
           <section className="workspace">
           <div className="contextRow">
-            <label className={isEditingPlan ? "" : "locked"}>
-              <span className="fieldHeader">
-                Plan context
-                {isEditingPlan ? (
-                  <span className="fieldActions">
-                    <button
-                      className="miniButton"
-                      type="button"
-                      onClick={() => saveDurableContext("plan")}
-                      disabled={isSavingContext}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="miniButton secondaryMini"
-                      type="button"
-                      onClick={() => {
-                        setPlanSource(savedPlanSource);
-                        setPlanVariant(savedPlanVariant);
-                        setPlanContext(savedPlanContext);
-                        setIsEditingPlan(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                ) : (
-                  <button className="miniButton" type="button" onClick={() => setIsEditingPlan(true)}>
-                    Edit
-                  </button>
-                )}
-              </span>
-              <select
-                value={planSource}
-                disabled={!isEditingPlan}
-                onChange={(event) => setPlanSource(event.target.value as TrainingPlanSource)}
-              >
-                {trainingPlanProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.label}
-                    {profile.variants?.length ? ` - ${profile.variants.slice(0, 3).join(", ")}` : ""}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={planVariant}
-                disabled={!isEditingPlan}
-                onChange={(event) => setPlanVariant(event.target.value)}
-                placeholder="Variant / level, e.g. 18/55, 2Q, NRC Marathon, Novice 2"
-              />
-              <textarea
-                value={planContext}
-                disabled={!isEditingPlan}
-                onChange={(event) => setPlanContext(event.target.value)}
-                placeholder="This week calls for threshold Tuesday, easy Thursday, long run Sunday..."
-              />
-            </label>
             <label className={isEditingGoals ? "" : "locked"}>
               <span className="fieldHeader">
                 Goals context
@@ -614,8 +611,310 @@ export default function Home() {
             </div>
           </aside>
         </section>
+        ) : (
+          <PlanWorkspace
+            isEditingPlan={isEditingPlan}
+            isSavingContext={isSavingContext}
+            onCancel={() => {
+              setPlanSource(savedPlanSource);
+              setPlanVariant(savedPlanVariant);
+              setPlanContext(savedPlanContext);
+              setState((current) => ({
+                ...current,
+                context: {
+                  ...current.context,
+                  structuredPlan: savedStructuredPlan
+                }
+              }));
+              setSelectedPlanWeek(currentCalendarWeek(savedStructuredPlan));
+              setIsEditingPlan(false);
+            }}
+            onEdit={() => setIsEditingPlan(true)}
+            onGenerate={generateStarterMarathonPlan}
+            onSave={() => saveDurableContext("plan")}
+            plan={visibleStructuredPlan}
+            planContext={planContext}
+            planSource={planSource}
+            planVariant={planVariant}
+            selectedPlanWeek={selectedPlanWeek}
+            setPlanContext={setPlanContext}
+            setPlanSource={setPlanSource}
+            setPlanVariant={setPlanVariant}
+            setSelectedPlanWeek={setSelectedPlanWeek}
+            setStarterCurrentMileage={setStarterCurrentMileage}
+            setStarterPlanWeeks={setStarterPlanWeeks}
+            setStarterRiskTolerance={setStarterRiskTolerance}
+            setStarterStartDate={setStarterStartDate}
+            setStarterTargetMileage={setStarterTargetMileage}
+            starterCurrentMileage={starterCurrentMileage}
+            starterPlanWeeks={starterPlanWeeks}
+            starterRiskTolerance={starterRiskTolerance}
+            starterStartDate={starterStartDate}
+            starterTargetMileage={starterTargetMileage}
+          />
+        )}
       </section>
     </main>
+  );
+}
+
+function PlanWorkspace({
+  isEditingPlan,
+  isSavingContext,
+  onCancel,
+  onEdit,
+  onGenerate,
+  onSave,
+  plan,
+  planContext,
+  planSource,
+  planVariant,
+  selectedPlanWeek,
+  setPlanContext,
+  setPlanSource,
+  setPlanVariant,
+  setSelectedPlanWeek,
+  setStarterCurrentMileage,
+  setStarterPlanWeeks,
+  setStarterRiskTolerance,
+  setStarterStartDate,
+  setStarterTargetMileage,
+  starterCurrentMileage,
+  starterPlanWeeks,
+  starterRiskTolerance,
+  starterStartDate,
+  starterTargetMileage
+}: {
+  isEditingPlan: boolean;
+  isSavingContext: boolean;
+  onCancel: () => void;
+  onEdit: () => void;
+  onGenerate: () => void;
+  onSave: () => void;
+  plan?: StructuredTrainingPlan;
+  planContext: string;
+  planSource: TrainingPlanSource;
+  planVariant: string;
+  selectedPlanWeek: number;
+  setPlanContext: (value: string) => void;
+  setPlanSource: (value: TrainingPlanSource) => void;
+  setPlanVariant: (value: string) => void;
+  setSelectedPlanWeek: (value: number) => void;
+  setStarterCurrentMileage: (value: number) => void;
+  setStarterPlanWeeks: (value: number) => void;
+  setStarterRiskTolerance: (value: MarathonPlanRiskTolerance) => void;
+  setStarterStartDate: (value: string) => void;
+  setStarterTargetMileage: (value: number) => void;
+  starterCurrentMileage: number;
+  starterPlanWeeks: number;
+  starterRiskTolerance: MarathonPlanRiskTolerance;
+  starterStartDate: string;
+  starterTargetMileage: number;
+}) {
+  const selectedWeek = plan?.weeks.find((week) => week.weekNumber === selectedPlanWeek) ?? plan?.weeks[0];
+  const selectedMetrics = plan && selectedWeek ? plannedWeekMetrics(plan, selectedWeek) : [];
+  const selectedDays = plan && selectedWeek ? calendarWorkoutDays(plan, selectedWeek) : [];
+
+  return (
+    <section className="planWorkspace">
+      <section className="planHero">
+        <div>
+          <p className="eyebrow">Plan</p>
+          <h2>{plan?.name ?? "Build a deterministic marathon plan"}</h2>
+          <p>{structuredPlanSummary(plan)}</p>
+        </div>
+        <div className="fieldActions">
+          {isEditingPlan ? (
+            <>
+              <button className="miniButton" onClick={onSave} disabled={isSavingContext} type="button">
+                Save plan
+              </button>
+              <button className="miniButton secondaryMini" onClick={onCancel} type="button">
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button className="miniButton" onClick={onEdit} type="button">
+              Edit plan
+            </button>
+          )}
+        </div>
+      </section>
+
+      <section className="planLayout">
+        <aside className="planBuilderPanel">
+          <div className="planBuilderHeader">
+            <h3>Plan builder</h3>
+            <span>{isEditingPlan ? "Editable" : "Locked"}</span>
+          </div>
+          <label>
+            <span>Plan source</span>
+            <select
+              value={planSource}
+              disabled={!isEditingPlan}
+              onChange={(event) => setPlanSource(event.target.value as TrainingPlanSource)}
+            >
+              {trainingPlanProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.label}
+                  {profile.variants?.length ? ` - ${profile.variants.slice(0, 3).join(", ")}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Variant</span>
+            <input
+              value={planVariant}
+              disabled={!isEditingPlan}
+              onChange={(event) => setPlanVariant(event.target.value)}
+              placeholder="TrainingTweaks generic marathon"
+            />
+          </label>
+          <div className="planBuilder">
+            <span>Starter marathon</span>
+            <label>
+              <span>Start date</span>
+              <input
+                aria-label="Plan start date"
+                disabled={!isEditingPlan}
+                onChange={(event) => setStarterStartDate(event.target.value)}
+                type="date"
+                value={starterStartDate}
+              />
+            </label>
+            <div className="planControlGrid">
+              <label>
+                <span>Current mi/wk</span>
+                <input
+                  aria-label="Current miles per week"
+                  disabled={!isEditingPlan}
+                  min={0}
+                  onChange={(event) => setStarterCurrentMileage(Number(event.target.value))}
+                  step={0.1}
+                  type="number"
+                  value={starterCurrentMileage}
+                />
+              </label>
+              <label>
+                <span>Target mi/wk</span>
+                <input
+                  aria-label="Target miles per week"
+                  disabled={!isEditingPlan}
+                  min={0}
+                  onChange={(event) => setStarterTargetMileage(Number(event.target.value))}
+                  step={0.1}
+                  type="number"
+                  value={starterTargetMileage}
+                />
+              </label>
+            </div>
+            <div className="planControlGrid">
+              <label>
+                <span>Weeks</span>
+                <input
+                  aria-label="Plan length weeks"
+                  disabled={!isEditingPlan}
+                  max={24}
+                  min={8}
+                  onChange={(event) => setStarterPlanWeeks(Number(event.target.value))}
+                  type="number"
+                  value={starterPlanWeeks}
+                />
+              </label>
+              <label>
+                <span>Risk tolerance</span>
+                <select
+                  aria-label="Risk tolerance"
+                  disabled={!isEditingPlan}
+                  onChange={(event) => setStarterRiskTolerance(event.target.value as MarathonPlanRiskTolerance)}
+                  value={starterRiskTolerance}
+                >
+                  <option value="low">low</option>
+                  <option value="regular">regular</option>
+                  <option value="high">high</option>
+                </select>
+              </label>
+            </div>
+            <button className="miniButton" disabled={!isEditingPlan} onClick={onGenerate} type="button">
+              Generate plan
+            </button>
+          </div>
+          <label>
+            <span>Plan notes</span>
+            <textarea
+              value={planContext}
+              disabled={!isEditingPlan}
+              onChange={(event) => setPlanContext(event.target.value)}
+              placeholder="Anything the plan builder should remember..."
+            />
+          </label>
+        </aside>
+
+        <section className="planViewer">
+          {plan ? (
+            <>
+              <div className="weekStrip" aria-label="Plan weeks">
+                {plan.weeks.map((week) => (
+                  <button
+                    className={week.weekNumber === selectedPlanWeek ? "active" : ""}
+                    key={week.weekNumber}
+                    onClick={() => setSelectedPlanWeek(week.weekNumber)}
+                    type="button"
+                  >
+                    <strong>Week {week.weekNumber}</strong>
+                    <span>{weekDateRange(plan, week.weekNumber)}</span>
+                  </button>
+                ))}
+              </div>
+              {selectedWeek ? (
+                <section className="weekPanel">
+                  <header className="weekHeader">
+                    <div>
+                      <p className="eyebrow">{weekDateRange(plan, selectedWeek.weekNumber)}</p>
+                      <h3>
+                        Week {selectedWeek.weekNumber}: {selectedWeek.focus}
+                      </h3>
+                    </div>
+                    <strong>{selectedWeek.targetMiles ?? 0} mi</strong>
+                  </header>
+                  <div className="planMetricGrid">
+                    {selectedMetrics.map((metric) => (
+                      <div className="planMetric" key={metric.label}>
+                        <span className={`metricDot ${metric.severity}`} />
+                        <small>{metric.label}</small>
+                        <strong>{metric.value}</strong>
+                        <p>{metric.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="workoutCalendar">
+                    {selectedDays.map((day) => (
+                      <article className={day.workout.type === "rest" ? "workoutDay restDay" : "workoutDay"} key={day.dayOfWeek}>
+                        <header>
+                          <span>{day.label}</span>
+                          <strong>{day.dateLabel}</strong>
+                        </header>
+                        <h4>{day.workout.label}</h4>
+                        <p>
+                          {day.workout.targetMiles ? `${day.workout.targetMiles} mi` : day.workout.durationMinutes ? `${day.workout.durationMinutes} min` : "No run"}
+                        </p>
+                        <small>{day.workout.purpose}</small>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          ) : (
+            <section className="emptyPlan">
+              <h3>No plan yet</h3>
+              <p>Open Edit plan, choose the builder inputs, generate a plan, then save it.</p>
+            </section>
+          )}
+        </section>
+      </section>
+    </section>
   );
 }
 
@@ -626,6 +925,129 @@ function Metric({ label, value }: { label: string; value: string | number }) {
       <dd>{value}</dd>
     </div>
   );
+}
+
+function estimateCurrentMilesPerWeek(summary: ActivitySummary) {
+  if (summary.mileageLast28Days > 0) return round1(summary.mileageLast28Days / 4);
+  if (summary.mileageLast14Days > 0) return round1(summary.mileageLast14Days / 2);
+  return summary.mileageLast7Days;
+}
+
+function peakPlanMileage(plan?: StructuredTrainingPlan) {
+  if (!plan?.weeks.length) return undefined;
+  return Math.max(...plan.weeks.map((week) => week.targetMiles ?? 0));
+}
+
+function plannedWeekMetrics(plan: StructuredTrainingPlan, week: TrainingPlanWeek) {
+  const assessment = (ruleId: string) =>
+    plan.generator?.riskAssessments.find((candidate) => candidate.weekNumber === week.weekNumber && candidate.ruleId === ruleId);
+  const targetMiles = week.targetMiles ?? 0;
+  const workouts = week.days.filter((day) => day.workout.type === "workout");
+  const workoutMiles = round1(workouts.reduce((total, day) => total + (day.workout.targetMiles ?? 0), 0));
+  const longRunMiles = week.days.find((day) => day.workout.type === "long_run")?.workout.targetMiles ?? 0;
+  const longRunShare = targetMiles ? round1((longRunMiles / targetMiles) * 100) : 0;
+  const load = assessment("weekly_volume_growth");
+  const intensity = assessment("hard_session_count");
+  const durability = assessment("long_run_percentage");
+
+  return [
+    {
+      label: "Expected load",
+      value: `${targetMiles} mi`,
+      detail: load?.message ?? "Week target mileage",
+      severity: load?.severity ?? "green"
+    },
+    {
+      label: "Expected intensity",
+      value: `${workouts.length} workout${workouts.length === 1 ? "" : "s"}`,
+      detail: workoutMiles ? `${workoutMiles} mi quality placeholder` : "No quality workout scheduled",
+      severity: intensity?.severity ?? "green"
+    },
+    {
+      label: "Expected durability",
+      value: `${longRunMiles} mi long`,
+      detail: durability?.message ?? `${longRunShare}% of week in long run`,
+      severity: durability?.severity ?? "green"
+    }
+  ];
+}
+
+function calendarWorkoutDays(plan: StructuredTrainingPlan, week: TrainingPlanWeek) {
+  return dayOrder.map((dayOfWeek, index) => {
+    const scheduled = week.days.find((day) => day.dayOfWeek === dayOfWeek);
+    return {
+      dayOfWeek,
+      label: dayLabel(dayOfWeek),
+      dateLabel: formatDate(addDays(planStartDate(plan), (week.weekNumber - 1) * 7 + index), {
+        month: "short",
+        day: "numeric"
+      }),
+      workout: scheduled?.workout ?? {
+        type: "rest" as const,
+        label: "Rest",
+        intensity: "off" as const,
+        purpose: "No run scheduled"
+      }
+    };
+  });
+}
+
+function weekDateRange(plan: StructuredTrainingPlan, weekNumber: number) {
+  const start = addDays(planStartDate(plan), (weekNumber - 1) * 7);
+  const end = addDays(start, 6);
+  return `${formatDate(start, { month: "short", day: "numeric" })} - ${formatDate(end, {
+    month: "short",
+    day: "numeric"
+  })}`;
+}
+
+function currentCalendarWeek(plan?: StructuredTrainingPlan) {
+  if (!plan) return 1;
+  const start = planStartDate(plan);
+  const today = stripTime(new Date());
+  const deltaDays = Math.floor((today.getTime() - start.getTime()) / millisecondsPerDay);
+  return Math.min(plan.durationWeeks, Math.max(1, Math.floor(deltaDays / 7) + 1));
+}
+
+function planStartDate(plan: StructuredTrainingPlan) {
+  return parseIsoDate(plan.startDate) ?? parseIsoDate(nextMondayIsoDate()) ?? stripTime(new Date());
+}
+
+function parseIsoDate(value: string | undefined) {
+  if (!value) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return undefined;
+  return stripTime(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+}
+
+function nextMondayIsoDate() {
+  const date = stripTime(new Date());
+  const daysUntilMonday = (8 - date.getDay()) % 7 || 7;
+  return isoDate(addDays(date, daysUntilMonday));
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function stripTime(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function isoDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatDate(date: Date, options: Intl.DateTimeFormatOptions) {
+  return date.toLocaleDateString(undefined, options);
+}
+
+function dayLabel(dayOfWeek: TrainingPlanDayOfWeek) {
+  return dayOfWeek.slice(0, 3).toUpperCase();
 }
 
 function buildDashboardGroups(findings: RiskFinding[], summary: ActivitySummary) {
@@ -767,6 +1189,10 @@ function signedPercent(value: number) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function round1(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 function Markdownish({ text }: { text: string }) {

@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       planSource: body.planSource,
       planVariant: body.planVariant?.trim(),
       planContext: body.planContext?.trim(),
+      structuredPlan: body.structuredPlan,
       goalsContext: body.goalsContext?.trim(),
       subjectiveContext: body.subjectiveContext?.trim()
     };

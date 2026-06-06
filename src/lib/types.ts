@@ -36,6 +36,7 @@ export type TrainingContext = {
   planSource?: TrainingPlanSource;
   planVariant?: string;
   planContext?: string;
+  structuredPlan?: StructuredTrainingPlan;
   goalsContext?: string;
   subjectiveContext?: string;
 };
@@ -63,6 +64,111 @@ export type JsonValue =
   | JsonObject;
 
 export type JsonObject = { [key: string]: JsonValue };
+
+export type TrainingPlanDayOfWeek =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export type TrainingPlanWorkoutType =
+  | "rest"
+  | "easy"
+  | "recovery"
+  | "long_run"
+  | "workout"
+  | "tempo"
+  | "interval"
+  | "marathon_pace"
+  | "cross_training";
+
+export type TrainingPlanWorkout = {
+  type: TrainingPlanWorkoutType;
+  label: string;
+  targetMiles?: number;
+  durationMinutes?: number;
+  intensity: "off" | "easy" | "moderate" | "hard";
+  purpose: string;
+  notes?: string;
+};
+
+export type TrainingPlanDay = {
+  dayOfWeek: TrainingPlanDayOfWeek;
+  workout: TrainingPlanWorkout;
+};
+
+export type TrainingPlanWeek = {
+  weekNumber: number;
+  focus: string;
+  targetMiles?: number;
+  days: TrainingPlanDay[];
+};
+
+export type TrainingPlanRiskTolerance = "low" | "regular" | "high";
+
+export type TrainingPlanRiskSeverity = "green" | "yellow" | "red";
+
+export type TrainingPlanRiskRule = {
+  ruleId: string;
+  label: string;
+  yellowAt: number;
+  redAt: number;
+  unit: string;
+};
+
+export type TrainingPlanRiskBudget = {
+  tolerance: TrainingPlanRiskTolerance;
+  allowedYellow: number;
+  allowedRed: number;
+  yellowRatio: number;
+  redRatio: number;
+};
+
+export type TrainingPlanRiskAssessment = {
+  weekNumber: number;
+  ruleId: string;
+  severity: TrainingPlanRiskSeverity;
+  observedValue: number;
+  unit: string;
+  message: string;
+  excludedFromBudget?: boolean;
+};
+
+export type StructuredTrainingPlanGenerator = {
+  id: string;
+  version: string;
+  plannedPeakMilesPerWeek: number;
+  inputs: {
+    currentMilesPerWeek: number;
+    targetMilesPerWeek: number;
+    requestedTargetMilesPerWeek: number;
+    durationWeeks: number;
+    riskTolerance: TrainingPlanRiskTolerance;
+  };
+  riskRules: TrainingPlanRiskRule[];
+  riskBudget: TrainingPlanRiskBudget;
+  riskCounts: Record<TrainingPlanRiskSeverity, number>;
+  riskAssessments: TrainingPlanRiskAssessment[];
+};
+
+export type StructuredTrainingPlan = {
+  schemaVersion: "1";
+  id: string;
+  sourceId?: string;
+  name: string;
+  source: "user_import" | "manual" | "trainingtweaks_generic";
+  sourceNotes?: string;
+  raceDistance?: "5k" | "10k" | "half_marathon" | "marathon";
+  startDate?: string;
+  durationWeeks: number;
+  currentWeek?: number;
+  currentDay?: TrainingPlanDayOfWeek;
+  weeks: TrainingPlanWeek[];
+  generator?: StructuredTrainingPlanGenerator;
+};
 
 export type RiskCategory =
   | "load"
