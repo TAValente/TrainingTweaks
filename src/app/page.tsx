@@ -1,12 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { buildStarterMarathonPlan, type MarathonPlanRiskTolerance } from "@/lib/marathon-plan";
+import { structuredPlanSummary } from "@/lib/structured-plans";
 import { trainingPlanProfiles } from "@/lib/training-plans";
 import type {
   Activity,
   ActivitySummary,
   RiskFinding,
   RiskSeverity,
+  StructuredTrainingPlan,
   TrainingContext,
   TrainingPlanSource
 } from "@/lib/types";
@@ -92,6 +95,11 @@ export default function Home() {
   const [savedPlanSource, setSavedPlanSource] = useState<TrainingPlanSource>("unknown");
   const [savedPlanVariant, setSavedPlanVariant] = useState("");
   const [savedPlanContext, setSavedPlanContext] = useState("");
+  const [savedStructuredPlan, setSavedStructuredPlan] = useState<StructuredTrainingPlan | undefined>();
+  const [starterCurrentMileage, setStarterCurrentMileage] = useState(0);
+  const [starterTargetMileage, setStarterTargetMileage] = useState(40);
+  const [starterPlanWeeks, setStarterPlanWeeks] = useState(16);
+  const [starterRiskTolerance, setStarterRiskTolerance] = useState<MarathonPlanRiskTolerance>("regular");
   const [savedGoalsContext, setSavedGoalsContext] = useState("");
   const [isEditingPlan, setIsEditingPlan] = useState(false);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
@@ -142,13 +150,17 @@ export default function Home() {
     const nextPlanVariant = nextState.context?.planVariant ?? "";
     const nextPlanContext = nextState.context?.planContext ?? "";
     const nextGoalsContext = nextState.context?.goalsContext ?? "";
+    const currentMileageEstimate = estimateCurrentMilesPerWeek(nextState.summary);
     setPlanSource(nextPlanSource);
     setPlanVariant(nextPlanVariant);
     setPlanContext(nextPlanContext);
+    setStarterCurrentMileage(currentMileageEstimate);
+    setStarterTargetMileage(Math.max(currentMileageEstimate, peakPlanMileage(nextState.context?.structuredPlan) ?? 40));
     setGoalsContext(nextGoalsContext);
     setSavedPlanSource(nextPlanSource);
     setSavedPlanVariant(nextPlanVariant);
     setSavedPlanContext(nextPlanContext);
+    setSavedStructuredPlan(nextState.context?.structuredPlan);
     setSavedGoalsContext(nextGoalsContext);
     setSubjectiveContext(nextState.context?.subjectiveContext ?? "");
     setStatus(nextState.connected ? "Strava connected." : "Connect Strava to refresh activities.");
@@ -171,6 +183,9 @@ export default function Home() {
         summary: payload.summary,
         riskFindings: payload.riskFindings
       }));
+      const currentMileageEstimate = estimateCurrentMilesPerWeek(payload.summary);
+      setStarterCurrentMileage(currentMileageEstimate);
+      setStarterTargetMileage((current) => Math.max(current, currentMileageEstimate));
       setStatus(`Imported ${payload.importedCount} recent Strava activities.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Refresh failed.";
@@ -194,6 +209,7 @@ export default function Home() {
           planSource,
           planVariant,
           planContext,
+          structuredPlan: state.context?.structuredPlan,
           goalsContext,
           subjectiveContext
         })
@@ -204,6 +220,7 @@ export default function Home() {
       setSavedPlanSource(planSource);
       setSavedPlanVariant(planVariant);
       setSavedPlanContext(planContext);
+      setSavedStructuredPlan(state.context?.structuredPlan);
       setSavedGoalsContext(goalsContext);
       if (kind === "plan") setIsEditingPlan(false);
       if (kind === "goals") setIsEditingGoals(false);
@@ -241,6 +258,7 @@ export default function Home() {
           planContext,
           planSource,
           planVariant,
+          structuredPlan: state.context?.structuredPlan,
           goalsContext,
           subjectiveContext,
           question
@@ -264,6 +282,25 @@ export default function Home() {
   async function logOut() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.assign("/login");
+  }
+
+  function generateStarterMarathonPlan() {
+    const structuredPlan = buildStarterMarathonPlan({
+      currentMilesPerWeek: starterCurrentMileage,
+      targetMilesPerWeek: starterTargetMileage,
+      durationWeeks: starterPlanWeeks,
+      riskTolerance: starterRiskTolerance
+    });
+    setState((current) => ({
+      ...current,
+      context: {
+        ...current.context,
+        structuredPlan
+      }
+    }));
+    setPlanSource("custom");
+    setPlanVariant("TrainingTweaks generic marathon");
+    setStatus("Starter marathon plan generated. Save plan context to persist it.");
   }
 
   async function saveFeedback() {
@@ -311,6 +348,7 @@ export default function Home() {
     Boolean(feedbackSavedAt) &&
     (feedbackNote.trim() !== savedFeedbackNote || feedbackRating !== savedFeedbackRating);
   const dashboard = buildDashboardGroups(state.riskFindings ?? [], state.summary);
+  const visibleStructuredPlan = state.context?.structuredPlan;
 
   return (
     <main className="appShell">
@@ -409,6 +447,13 @@ export default function Home() {
                         setPlanSource(savedPlanSource);
                         setPlanVariant(savedPlanVariant);
                         setPlanContext(savedPlanContext);
+                        setState((current) => ({
+                          ...current,
+                          context: {
+                            ...current.context,
+                            structuredPlan: savedStructuredPlan
+                          }
+                        }));
                         setIsEditingPlan(false);
                       }}
                     >
@@ -439,6 +484,52 @@ export default function Home() {
                 onChange={(event) => setPlanVariant(event.target.value)}
                 placeholder="Variant / level, e.g. 18/55, 2Q, NRC Marathon, Novice 2"
               />
+              {isEditingPlan ? (
+                <div className="planBuilder">
+                  <span>Starter marathon</span>
+                  <div className="planControlGrid">
+                    <input
+                      aria-label="Current miles per week"
+                      min={0}
+                      onChange={(event) => setStarterCurrentMileage(Number(event.target.value))}
+                      step={0.1}
+                      type="number"
+                      value={starterCurrentMileage}
+                    />
+                    <input
+                      aria-label="Target miles per week"
+                      min={0}
+                      onChange={(event) => setStarterTargetMileage(Number(event.target.value))}
+                      step={0.1}
+                      type="number"
+                      value={starterTargetMileage}
+                    />
+                  </div>
+                  <div className="planControlGrid">
+                    <input
+                      aria-label="Plan length weeks"
+                      max={24}
+                      min={8}
+                      onChange={(event) => setStarterPlanWeeks(Number(event.target.value))}
+                      type="number"
+                      value={starterPlanWeeks}
+                    />
+                    <select
+                      aria-label="Risk tolerance"
+                      onChange={(event) => setStarterRiskTolerance(event.target.value as MarathonPlanRiskTolerance)}
+                      value={starterRiskTolerance}
+                    >
+                      <option value="low">low risk</option>
+                      <option value="regular">regular risk</option>
+                      <option value="high">high risk</option>
+                    </select>
+                  </div>
+                  <button className="miniButton" onClick={generateStarterMarathonPlan} type="button">
+                    Generate starter
+                  </button>
+                </div>
+              ) : null}
+              <p className="planSnapshot">{structuredPlanSummary(visibleStructuredPlan)}</p>
               <textarea
                 value={planContext}
                 disabled={!isEditingPlan}
@@ -628,6 +719,17 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function estimateCurrentMilesPerWeek(summary: ActivitySummary) {
+  if (summary.mileageLast28Days > 0) return round1(summary.mileageLast28Days / 4);
+  if (summary.mileageLast14Days > 0) return round1(summary.mileageLast14Days / 2);
+  return summary.mileageLast7Days;
+}
+
+function peakPlanMileage(plan?: StructuredTrainingPlan) {
+  if (!plan?.weeks.length) return undefined;
+  return Math.max(...plan.weeks.map((week) => week.targetMiles ?? 0));
+}
+
 function buildDashboardGroups(findings: RiskFinding[], summary: ActivitySummary) {
   const signalFindings = findings.filter((finding) => finding.category !== "data_quality");
   return dashboardGroups.map((group) => {
@@ -767,6 +869,10 @@ function signedPercent(value: number) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function round1(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 function Markdownish({ text }: { text: string }) {
