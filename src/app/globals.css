@@ -1,13 +1,16 @@
 :root {
-  --bg: #f7f5ef;
-  --ink: #20211d;
-  --muted: #676a61;
-  --line: #d8d2c4;
-  --panel: #fffdf8;
+  --bg: #f3f5ef;
+  --ink: #1c211d;
+  --muted: #626a60;
+  --line: #d9ded2;
+  --panel: #fffffb;
+  --surface: #f7f9f3;
   --accent: #0f766e;
   --accent-dark: #115e59;
-  --warm: #b45309;
-  --shadow: 0 18px 50px rgba(32, 33, 29, 0.08);
+  --green: #16803c;
+  --warm: #b7791f;
+  --danger: #b42318;
+  --shadow: 0 14px 38px rgba(28, 33, 29, 0.08);
 }
 
 * {
@@ -33,21 +36,25 @@ a {
 .shell {
   width: min(1440px, calc(100% - 40px));
   margin: 0 auto;
-  padding: 28px 0 48px;
+  padding: 20px 0 44px;
 }
 
 .topbar {
+  background: #20261f;
+  border: 1px solid #2f382f;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  color: #fffdf8;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 22px;
+  padding: 18px;
 }
 
 .eyebrow {
   margin: 0 0 8px;
-  color: var(--accent-dark);
+  color: #85d1c9;
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -56,8 +63,8 @@ a {
 h1 {
   max-width: 760px;
   margin: 0;
-  font-size: clamp(2rem, 4vw, 4.25rem);
-  line-height: 0.98;
+  font-size: clamp(1.85rem, 3vw, 3.2rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -76,7 +83,7 @@ h2 {
 .button {
   min-height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--accent);
   color: white;
   cursor: pointer;
@@ -103,16 +110,32 @@ h2 {
   color: var(--ink);
 }
 
+.topbar .button.secondary {
+  border-color: rgba(255, 253, 248, 0.26);
+  color: #fffdf8;
+}
+
 .button.secondary:hover {
   border-color: var(--accent);
   color: var(--accent-dark);
 }
 
+.topbar .button.secondary:hover {
+  background: rgba(255, 253, 248, 0.08);
+  border-color: rgba(255, 253, 248, 0.44);
+  color: #fffdf8;
+}
+
 .statusLine {
+  background: rgba(255, 255, 251, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 46px;
+  margin: 14px 0;
+  padding: 0 14px;
   color: var(--muted);
 }
 
@@ -139,7 +162,7 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
+  grid-template-columns: minmax(360px, 430px) 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -161,7 +184,7 @@ h2 {
 }
 
 .panel {
-  padding: 18px;
+  padding: 16px;
 }
 
 .summaryGrid {
@@ -176,7 +199,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  background: #faf8f1;
+  background: var(--surface);
 }
 
 dt {
@@ -199,55 +222,52 @@ dd {
 
 .riskList {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .riskItem {
-  align-items: start;
+  align-items: center;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 10px;
-  grid-template-columns: auto 1fr;
-  padding: 10px;
+  gap: 9px;
+  grid-template-columns: 12px 1fr;
+  min-height: 54px;
+  padding: 9px 10px;
 }
 
 .riskItem strong {
   display: block;
-  font-size: 0.92rem;
-  margin-bottom: 3px;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
 }
 
 .riskItem p {
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   line-height: 1.4;
   margin: 0;
 }
 
-.riskBadge {
-  border: 1px solid var(--line);
+.riskDot {
   border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 4px 7px;
-  text-transform: uppercase;
+  box-shadow: 0 0 0 3px rgba(28, 33, 29, 0.05);
+  display: block;
+  height: 10px;
+  width: 10px;
 }
 
-.riskBadge.yellow {
-  border-color: rgba(180, 83, 9, 0.35);
-  color: var(--warm);
+.riskDot.green {
+  background: var(--green);
 }
 
-.riskBadge.red {
-  border-color: #f3b4a8;
-  color: #8f2f1f;
+.riskDot.yellow {
+  background: var(--warm);
 }
 
-.riskBadge.green {
-  border-color: rgba(15, 118, 110, 0.32);
-  color: var(--accent-dark);
+.riskDot.red {
+  background: var(--danger);
 }
 
 .activityList {

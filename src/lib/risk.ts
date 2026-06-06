@@ -18,7 +18,7 @@ export const defaultRiskConfig: RiskEngineConfig = {
   rules: {
     weeklyVolumeGrowth: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       minActivities: 2,
       minMileage: 3,
@@ -27,7 +27,7 @@ export const defaultRiskConfig: RiskEngineConfig = {
     },
     acwrMileage: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       baselineDays: 28,
       minActivities: 4,
@@ -37,52 +37,52 @@ export const defaultRiskConfig: RiskEngineConfig = {
     },
     consecutiveBuildWeeks: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       baselineDays: 56,
       minActivities: 6,
-      thresholds: { yellow: 4, red: 6 },
+      thresholds: { green: 0, yellow: 4, red: 6 },
       confidence: "medium"
     },
     longRunPercentage: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       minActivities: 2,
       minMileage: 8,
-      thresholds: { yellow: 0.3, red: 0.4 },
+      thresholds: { green: 0, yellow: 0.3, red: 0.4 },
       confidence: "high"
     },
     longRunJump: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       baselineDays: 28,
       minActivities: 4,
       minMileage: 8,
-      thresholds: { yellow: 0.2, red: 0.35 },
+      thresholds: { green: 0, yellow: 0.2, red: 0.35 },
       confidence: "medium"
     },
     hardSessionCount: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       minActivities: 2,
-      thresholds: { yellow: 2, red: 3 },
+      thresholds: { green: 0, yellow: 2, red: 3 },
       confidence: "high"
     },
     intensitySpike: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       baselineDays: 28,
       minActivities: 4,
-      thresholds: { yellow: 0.25, red: 0.5 },
+      thresholds: { green: 0, yellow: 0.25, red: 0.5 },
       confidence: "medium"
     },
     hardDayClustering: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 7,
       severities: {
         backToBackHard: "yellow",
@@ -100,18 +100,19 @@ export const defaultRiskConfig: RiskEngineConfig = {
     },
     consecutiveRunningDays: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 14,
-      thresholds: { yellow: 5, red: 7 },
+      thresholds: { green: 0, yellow: 5, red: 7 },
       confidence: "medium"
     },
     trainingNovelty: {
       enabled: true,
-      includeGreen: false,
+      includeGreen: true,
       lookbackDays: 14,
       baselineDays: 56,
       minActivities: 6,
       thresholds: {
+        green: 0,
         yellow: 2,
         red: 4,
         componentYellowRatio: 1.2,
@@ -236,13 +237,14 @@ export function evaluateWeeklyVolumeGrowth(context: RiskContext): RiskFinding[] 
   const growth = mileage(current) / mileage(prior) - 1;
   const severity = severityFromThresholds(growth, rule);
   if (!shouldEmit(severity, rule)) return [];
+  const growthDirection = growth >= 0 ? "above" : "below";
   return [
     makeFinding(context, rule, {
       ruleId,
       category: "load",
       severity,
-      title: "Weekly volume increased",
-      message: `Current ${days}-day mileage is ${percent(growth)} above the prior ${days} days.`,
+      title: severity === "green" ? "Weekly volume growth is within guardrails" : "Weekly volume increased",
+      message: `Current ${days}-day mileage is ${percent(Math.abs(growth))} ${growthDirection} the prior ${days} days.`,
       observedValue: round2(growth),
       thresholdValue: thresholdForSeverity(severity, rule),
       unit: "growth_ratio",
@@ -289,7 +291,7 @@ export function evaluateAcwr(context: RiskContext): RiskFinding[] {
       ruleId,
       category: "load",
       severity,
-      title: "Acute mileage load is elevated",
+      title: severity === "green" ? "Acute mileage load is within guardrails" : "Acute mileage load is elevated",
       message: `Current ${days}-day mileage is ${round2(ratio)}x the trailing weekly baseline.`,
       observedValue: round2(ratio),
       thresholdValue: thresholdForSeverity(severity, rule),
@@ -320,7 +322,7 @@ export function evaluateConsecutiveBuildWeeks(context: RiskContext): RiskFinding
       ruleId,
       category: "load",
       severity,
-      title: "Consecutive build weeks detected",
+      title: severity === "green" ? "Build-week streak is within guardrails" : "Consecutive build weeks detected",
       message: `Weekly mileage has increased for ${streak} consecutive week-to-week comparisons.`,
       observedValue: streak,
       thresholdValue: thresholdForSeverity(severity, rule),
@@ -350,7 +352,7 @@ export function evaluateLongRunPercentage(context: RiskContext): RiskFinding[] {
       ruleId,
       category: "long_run",
       severity,
-      title: "Long run share is elevated",
+      title: severity === "green" ? "Long run share is within guardrails" : "Long run share is elevated",
       message: `Longest run was ${percent(share)} of ${days}-day mileage.`,
       observedValue: round2(share),
       thresholdValue: thresholdForSeverity(severity, rule),
@@ -379,13 +381,14 @@ export function evaluateLongRunJump(context: RiskContext): RiskFinding[] {
   const jump = currentLongest / baselineAverage - 1;
   const severity = severityFromThresholds(jump, rule);
   if (!shouldEmit(severity, rule)) return [];
+  const jumpDirection = jump >= 0 ? "above" : "below";
   return [
     makeFinding(context, rule, {
       ruleId,
       category: "long_run",
       severity,
-      title: "Long run increased from baseline",
-      message: `Current long run is ${percent(jump)} above the prior long-run baseline.`,
+      title: severity === "green" ? "Long run change is within guardrails" : "Long run increased from baseline",
+      message: `Current long run is ${percent(Math.abs(jump))} ${jumpDirection} the prior long-run baseline.`,
       observedValue: round2(jump),
       thresholdValue: thresholdForSeverity(severity, rule),
       unit: "growth_ratio",
@@ -409,7 +412,7 @@ export function evaluateHardSessionCount(context: RiskContext): RiskFinding[] {
       ruleId,
       category: "intensity",
       severity,
-      title: "Hard session count is elevated",
+      title: severity === "green" ? "Hard session count is within guardrails" : "Hard session count is elevated",
       message: `${hardRuns.length} inferred hard sessions occurred in the last ${days} days.`,
       observedValue: hardRuns.length,
       thresholdValue: thresholdForSeverity(severity, rule),
@@ -434,14 +437,15 @@ export function evaluateIntensitySpike(context: RiskContext): RiskFinding[] {
   const increase = currentProxy.value / averageBaseline - 1;
   const severity = severityFromThresholds(increase, rule);
   if (!shouldEmit(severity, rule)) return [];
+  const increaseDirection = increase >= 0 ? "above" : "below";
   return [
     makeFinding(context, rule, {
       ruleId,
       category: "intensity",
       severity,
       confidence: currentProxy.confidence,
-      title: "Intensity load increased",
-      message: `Current hard-load proxy is ${percent(increase)} above the trailing baseline.`,
+      title: severity === "green" ? "Intensity load is within guardrails" : "Intensity load increased",
+      message: `Current hard-load proxy is ${percent(Math.abs(increase))} ${increaseDirection} the trailing baseline.`,
       observedValue: round2(increase),
       thresholdValue: thresholdForSeverity(severity, rule),
       unit: "growth_ratio",
@@ -526,6 +530,21 @@ export function evaluateHardDayClustering(context: RiskContext): RiskFinding[] {
     }));
   }
 
+  if (!findings.length && rule.includeGreen) {
+    findings.push(makeFinding(context, rule, {
+      ruleId,
+      category: "recovery",
+      severity: "green",
+      title: "Hard-day spacing is within guardrails",
+      message: "No configured hard-day clustering pattern was detected.",
+      observedValue: hardRuns.length,
+      thresholdValue: rule.thresholds.threeHardSessionsDays,
+      unit: "hard_sessions",
+      lookbackDays: days,
+      evidence: { hardRuns: hardRuns.map(hardRunEvidence) }
+    }));
+  }
+
   return dedupeRuleFindings(findings);
 }
 
@@ -543,8 +562,8 @@ export function evaluateConsecutiveRunningDays(context: RiskContext): RiskFindin
       ruleId,
       category: "recovery",
       severity,
-      title: "Running streak is elevated",
-      message: `Running streak is elevated relative to default guardrails: ${streak} consecutive running days.`,
+      title: severity === "green" ? "Running streak is within guardrails" : "Running streak is elevated",
+      message: `${streak} consecutive running days detected.`,
       observedValue: streak,
       thresholdValue: thresholdForSeverity(severity, rule),
       unit: "days",
@@ -582,8 +601,8 @@ export function evaluateTrainingNovelty(context: RiskContext): RiskFinding[] {
       ruleId,
       category: "novelty",
       severity,
-      title: "Training block novelty is elevated",
-      message: severity === "red" ? "Current training block differs substantially from the recent baseline." : "Current training block differs from the recent baseline.",
+      title: severity === "green" ? "Training block novelty is within guardrails" : "Training block novelty is elevated",
+      message: severity === "green" ? "Current training block is close to the recent baseline." : severity === "red" ? "Current training block differs substantially from the recent baseline." : "Current training block differs from the recent baseline.",
       observedValue: score,
       thresholdValue: thresholdForSeverity(severity, rule),
       unit: "novelty_points",

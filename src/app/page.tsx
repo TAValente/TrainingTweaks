@@ -2,7 +2,14 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trainingPlanProfiles } from "@/lib/training-plans";
-import type { Activity, ActivitySummary, RiskFinding, TrainingContext, TrainingPlanSource } from "@/lib/types";
+import type {
+  Activity,
+  ActivitySummary,
+  RiskFinding,
+  RiskSeverity,
+  TrainingContext,
+  TrainingPlanSource
+} from "@/lib/types";
 
 type AppState = {
   connected: boolean;
@@ -36,6 +43,19 @@ const emptySummary: ActivitySummary = {
   runCountLast1825Days: 0,
   fastestEfforts: []
 };
+
+const riskSignalDefinitions = [
+  { ruleId: "weekly_volume_growth", label: "Weekly volume growth" },
+  { ruleId: "acwr_mileage", label: "Acute/chronic load" },
+  { ruleId: "consecutive_build_weeks", label: "Build-week streak" },
+  { ruleId: "long_run_percentage", label: "Long-run share" },
+  { ruleId: "long_run_jump", label: "Long-run jump" },
+  { ruleId: "hard_session_count", label: "Hard sessions" },
+  { ruleId: "intensity_spike", label: "Intensity spike" },
+  { ruleId: "hard_day_clustering", label: "Hard-day clustering" },
+  { ruleId: "consecutive_running_days", label: "Run streak" },
+  { ruleId: "training_novelty", label: "Training novelty" }
+];
 
 export default function Home() {
   const [state, setState] = useState<AppState>({
@@ -320,7 +340,7 @@ export default function Home() {
 
           <div className="panel">
             <h2>Risk Signals</h2>
-            <RiskFindingList findings={state.riskFindings ?? []} />
+            <RiskFindingList findings={state.riskFindings ?? []} summary={state.summary} />
           </div>
 
           <div className="panel">
@@ -545,28 +565,78 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function RiskFindingList({ findings }: { findings: RiskFinding[] }) {
-  const visibleFindings = findings
-    .filter((finding) => finding.severity !== "info")
-    .slice(0, 6);
-
-  if (!visibleFindings.length) {
-    return <p className="muted">No elevated deterministic risk signals from stored running history.</p>;
-  }
+function RiskFindingList({ findings, summary }: { findings: RiskFinding[]; summary: ActivitySummary }) {
+  const signalFindings = findings.filter((finding) => finding.category !== "data_quality");
 
   return (
     <div className="riskList">
-      {visibleFindings.map((finding, index) => (
-        <div className="riskItem" key={`${finding.id}-${index}`}>
-          <span className={`riskBadge ${finding.severity}`}>{finding.severity}</span>
-          <div>
-            <strong>{finding.title}</strong>
-            <p>{finding.message}</p>
+      {riskSignalDefinitions.map((definition) => {
+        const finding = strongestFinding(signalFindings.filter((candidate) => candidate.ruleId === definition.ruleId));
+        const severity = finding?.severity === "yellow" || finding?.severity === "red" ? finding.severity : "green";
+        return (
+          <div className="riskItem" key={definition.ruleId}>
+            <span className={`riskDot ${severity}`} aria-label={`${severity} signal`} />
+            <div>
+              <strong>{definition.label}</strong>
+              <p>{riskCalculation(definition.ruleId, finding, summary)}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
+}
+
+function strongestFinding(findings: RiskFinding[]) {
+  const severityOrder: Record<RiskSeverity, number> = {
+    info: 0,
+    green: 1,
+    yellow: 2,
+    red: 3
+  };
+  return findings.sort((left, right) => severityOrder[right.severity] - severityOrder[left.severity])[0];
+}
+
+function riskCalculation(ruleId: string, finding: RiskFinding | undefined, summary: ActivitySummary) {
+  if (finding) {
+    const observed = finding.observedValue;
+    const threshold = finding.thresholdValue;
+    if (ruleId === "weekly_volume_growth") return ratioLine("7d growth", observed, threshold);
+    if (ruleId === "acwr_mileage") return numberLine("7d / baseline", observed, threshold, "x");
+    if (ruleId === "consecutive_build_weeks") return countLine("build weeks", observed, threshold);
+    if (ruleId === "long_run_percentage") return ratioLine("long run share", observed, threshold);
+    if (ruleId === "long_run_jump") return ratioLine("long run change", observed, threshold);
+    if (ruleId === "hard_session_count") return countLine("hard sessions", observed, threshold);
+    if (ruleId === "intensity_spike") return ratioLine(`${finding.evidence.proxy ?? "load"} change`, observed, threshold);
+    if (ruleId === "hard_day_clustering") return countLine("hard sessions checked", observed, threshold);
+    if (ruleId === "consecutive_running_days") return countLine("day streak", observed, threshold);
+    if (ruleId === "training_novelty") return countLine("novelty points", observed, threshold);
+  }
+
+  if (ruleId === "weekly_volume_growth") return `${summary.mileageLast7Days} mi in 7d`;
+  if (ruleId === "acwr_mileage") return `${summary.mileageLast7Days} mi / 7d, ${summary.mileageLast28Days} mi / 28d`;
+  if (ruleId === "long_run_percentage") return `${summary.longestRunLast14DaysMiles} mi long run, ${summary.mileageLast7Days} mi / 7d`;
+  if (ruleId === "hard_session_count" || ruleId === "intensity_spike") {
+    return `${summary.recentIntensityIndicators.length} recent intensity indicators`;
+  }
+
+  return "Waiting on enough stored running history";
+}
+
+function ratioLine(label: string, observed?: number, threshold?: number) {
+  return `${label}: ${observed === undefined ? "n/a" : `${Math.round(observed * 100)}%`}${
+    threshold === undefined ? "" : ` / ${Math.round(threshold * 100)}%`
+  }`;
+}
+
+function numberLine(label: string, observed?: number, threshold?: number, unit = "") {
+  return `${label}: ${observed === undefined ? "n/a" : `${observed}${unit}`}${
+    threshold === undefined ? "" : ` / ${threshold}${unit}`
+  }`;
+}
+
+function countLine(label: string, observed?: number, threshold?: number) {
+  return `${label}: ${observed ?? "n/a"}${threshold === undefined ? "" : ` / ${threshold}`}`;
 }
 
 function Markdownish({ text }: { text: string }) {
