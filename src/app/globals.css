@@ -1,13 +1,16 @@
 :root {
-  --bg: #f7f5ef;
-  --ink: #20211d;
-  --muted: #676a61;
-  --line: #d8d2c4;
-  --panel: #fffdf8;
+  --bg: #f3f5ef;
+  --ink: #1c211d;
+  --muted: #626a60;
+  --line: #d9ded2;
+  --panel: #fffffb;
+  --surface: #f7f9f3;
   --accent: #0f766e;
   --accent-dark: #115e59;
-  --warm: #b45309;
-  --shadow: 0 18px 50px rgba(32, 33, 29, 0.08);
+  --green: #16803c;
+  --warm: #b7791f;
+  --danger: #b42318;
+  --shadow: 0 14px 38px rgba(28, 33, 29, 0.08);
 }
 
 * {
@@ -30,24 +33,252 @@ a {
   font: inherit;
 }
 
+.appShell {
+  min-height: 100svh;
+  background: #eff2ea;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.navRail {
+  background: #1f271f;
+  border-right: 1px solid #303a30;
+  color: #fffdf8;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  min-height: 100svh;
+  padding: 22px 18px;
+}
+
+.navRail h1 {
+  font-size: 1.55rem;
+  line-height: 1;
+  margin: 0;
+}
+
+.navRail nav {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.navRail nav a {
+  border-radius: 7px;
+  color: rgba(255, 253, 248, 0.74);
+  font-weight: 750;
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.navRail nav a.active,
+.navRail nav a:hover {
+  background: rgba(255, 253, 248, 0.08);
+  color: #fffdf8;
+}
+
+.navActions {
+  display: grid;
+  gap: 9px;
+}
+
+.navRail .button.secondary {
+  border-color: rgba(255, 253, 248, 0.26);
+  color: #fffdf8;
+}
+
+.navRail .button.secondary:hover {
+  background: rgba(255, 253, 248, 0.08);
+  border-color: rgba(255, 253, 248, 0.44);
+  color: #fffdf8;
+}
+
+.appMain {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.appHeader {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.appHeader h2 {
+  font-size: 1.9rem;
+  line-height: 1;
+  margin: 0;
+}
+
+.statusDashboard {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-bottom: 16px;
+}
+
+.statusCard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.statusCard header {
+  display: grid;
+  gap: 5px;
+}
+
+.statusCard header div {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.statusCard h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.statusCard strong {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.statusCard p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.statusBars {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.statusBar {
+  background: #d7ddd2;
+  border-radius: 999px;
+  height: 8px;
+  opacity: 0.55;
+}
+
+.statusBar.active {
+  box-shadow: 0 0 0 2px rgba(28, 33, 29, 0.08);
+  opacity: 1;
+}
+
+.statusBar.de-training.active {
+  background: #6b7280;
+}
+
+.statusBar.productive.active {
+  background: var(--green);
+}
+
+.statusBar.risky.active {
+  background: var(--warm);
+}
+
+.statusBar.high-risk.active {
+  background: var(--danger);
+}
+
+.metricList {
+  display: grid;
+  gap: 6px;
+}
+
+.metricLine {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 10px minmax(86px, 1fr) auto minmax(96px, 1fr);
+  min-height: 30px;
+  padding-top: 6px;
+}
+
+.metricLine strong,
+.metricLine b,
+.metricLine small {
+  min-width: 0;
+}
+
+.metricLine strong {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.metricLine b {
+  font-size: 0.86rem;
+  justify-self: end;
+}
+
+.metricLine small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.metricDot {
+  border-radius: 999px;
+  height: 9px;
+  width: 9px;
+}
+
+.metricDot.green {
+  background: var(--green);
+}
+
+.metricDot.yellow {
+  background: var(--warm);
+}
+
+.metricDot.red {
+  background: var(--danger);
+}
+
+.coreGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  gap: 16px;
+  align-items: start;
+}
+
 .shell {
   width: min(1440px, calc(100% - 40px));
   margin: 0 auto;
-  padding: 28px 0 48px;
+  padding: 20px 0 44px;
 }
 
 .topbar {
+  background: #20261f;
+  border: 1px solid #2f382f;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  color: #fffdf8;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 22px;
+  padding: 18px;
 }
 
 .eyebrow {
   margin: 0 0 8px;
-  color: var(--accent-dark);
+  color: #85d1c9;
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -56,8 +287,8 @@ a {
 h1 {
   max-width: 760px;
   margin: 0;
-  font-size: clamp(2rem, 4vw, 4.25rem);
-  line-height: 0.98;
+  font-size: clamp(1.85rem, 3vw, 3.2rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
@@ -76,7 +307,7 @@ h2 {
 .button {
   min-height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: var(--accent);
   color: white;
   cursor: pointer;
@@ -103,16 +334,32 @@ h2 {
   color: var(--ink);
 }
 
+.topbar .button.secondary {
+  border-color: rgba(255, 253, 248, 0.26);
+  color: #fffdf8;
+}
+
 .button.secondary:hover {
   border-color: var(--accent);
   color: var(--accent-dark);
 }
 
+.topbar .button.secondary:hover {
+  background: rgba(255, 253, 248, 0.08);
+  border-color: rgba(255, 253, 248, 0.44);
+  color: #fffdf8;
+}
+
 .statusLine {
+  background: rgba(255, 255, 251, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 46px;
+  margin: 14px 0;
+  padding: 0 14px;
   color: var(--muted);
 }
 
@@ -139,7 +386,7 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
+  grid-template-columns: minmax(360px, 430px) 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -161,7 +408,7 @@ h2 {
 }
 
 .panel {
-  padding: 18px;
+  padding: 16px;
 }
 
 .summaryGrid {
@@ -176,7 +423,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  background: #faf8f1;
+  background: var(--surface);
 }
 
 dt {
@@ -199,55 +446,52 @@ dd {
 
 .riskList {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .riskItem {
-  align-items: start;
+  align-items: center;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
-  gap: 10px;
-  grid-template-columns: auto 1fr;
-  padding: 10px;
+  gap: 9px;
+  grid-template-columns: 12px 1fr;
+  min-height: 54px;
+  padding: 9px 10px;
 }
 
 .riskItem strong {
   display: block;
-  font-size: 0.92rem;
-  margin-bottom: 3px;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
 }
 
 .riskItem p {
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   line-height: 1.4;
   margin: 0;
 }
 
-.riskBadge {
-  border: 1px solid var(--line);
+.riskDot {
   border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 4px 7px;
-  text-transform: uppercase;
+  box-shadow: 0 0 0 3px rgba(28, 33, 29, 0.05);
+  display: block;
+  height: 10px;
+  width: 10px;
 }
 
-.riskBadge.yellow {
-  border-color: rgba(180, 83, 9, 0.35);
-  color: var(--warm);
+.riskDot.green {
+  background: var(--green);
 }
 
-.riskBadge.red {
-  border-color: #f3b4a8;
-  color: #8f2f1f;
+.riskDot.yellow {
+  background: var(--warm);
 }
 
-.riskBadge.green {
-  border-color: rgba(15, 118, 110, 0.32);
-  color: var(--accent-dark);
+.riskDot.red {
+  background: var(--danger);
 }
 
 .activityList {
@@ -276,7 +520,7 @@ dd {
 
 .contextRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px;
 }
 
@@ -559,6 +803,29 @@ input:disabled {
 }
 
 @media (max-width: 980px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+
+  .navRail {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .navActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .appHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .statusDashboard,
+  .coreGrid {
+    grid-template-columns: 1fr;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
@@ -581,6 +848,23 @@ input:disabled {
 }
 
 @media (max-width: 560px) {
+  .appMain {
+    padding: 14px;
+  }
+
+  .navActions,
+  .metricLine {
+    grid-template-columns: 1fr;
+  }
+
+  .metricLine {
+    gap: 4px;
+  }
+
+  .metricLine b {
+    justify-self: start;
+  }
+
   .shell {
     width: min(100% - 24px, 1440px);
     padding-top: 18px;
