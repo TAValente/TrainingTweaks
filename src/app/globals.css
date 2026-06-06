@@ -33,6 +33,230 @@ a {
   font: inherit;
 }
 
+.appShell {
+  min-height: 100svh;
+  background: #eff2ea;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.navRail {
+  background: #1f271f;
+  border-right: 1px solid #303a30;
+  color: #fffdf8;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  min-height: 100svh;
+  padding: 22px 18px;
+}
+
+.navRail h1 {
+  font-size: 1.55rem;
+  line-height: 1;
+  margin: 0;
+}
+
+.navRail nav {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.navRail nav a {
+  border-radius: 7px;
+  color: rgba(255, 253, 248, 0.74);
+  font-weight: 750;
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.navRail nav a.active,
+.navRail nav a:hover {
+  background: rgba(255, 253, 248, 0.08);
+  color: #fffdf8;
+}
+
+.navActions {
+  display: grid;
+  gap: 9px;
+}
+
+.navRail .button.secondary {
+  border-color: rgba(255, 253, 248, 0.26);
+  color: #fffdf8;
+}
+
+.navRail .button.secondary:hover {
+  background: rgba(255, 253, 248, 0.08);
+  border-color: rgba(255, 253, 248, 0.44);
+  color: #fffdf8;
+}
+
+.appMain {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.appHeader {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.appHeader h2 {
+  font-size: 1.9rem;
+  line-height: 1;
+  margin: 0;
+}
+
+.statusDashboard {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-bottom: 16px;
+}
+
+.statusCard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.statusCard header {
+  display: grid;
+  gap: 5px;
+}
+
+.statusCard header div {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.statusCard h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.statusCard strong {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.statusCard p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.statusBars {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.statusBar {
+  background: #d7ddd2;
+  border-radius: 999px;
+  height: 8px;
+  opacity: 0.55;
+}
+
+.statusBar.active {
+  box-shadow: 0 0 0 2px rgba(28, 33, 29, 0.08);
+  opacity: 1;
+}
+
+.statusBar.de-training.active {
+  background: #6b7280;
+}
+
+.statusBar.productive.active {
+  background: var(--green);
+}
+
+.statusBar.risky.active {
+  background: var(--warm);
+}
+
+.statusBar.high-risk.active {
+  background: var(--danger);
+}
+
+.metricList {
+  display: grid;
+  gap: 6px;
+}
+
+.metricLine {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 10px minmax(86px, 1fr) auto minmax(96px, 1fr);
+  min-height: 30px;
+  padding-top: 6px;
+}
+
+.metricLine strong,
+.metricLine b,
+.metricLine small {
+  min-width: 0;
+}
+
+.metricLine strong {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.metricLine b {
+  font-size: 0.86rem;
+  justify-self: end;
+}
+
+.metricLine small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.metricDot {
+  border-radius: 999px;
+  height: 9px;
+  width: 9px;
+}
+
+.metricDot.green {
+  background: var(--green);
+}
+
+.metricDot.yellow {
+  background: var(--warm);
+}
+
+.metricDot.red {
+  background: var(--danger);
+}
+
+.coreGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  gap: 16px;
+  align-items: start;
+}
+
 .shell {
   width: min(1440px, calc(100% - 40px));
   margin: 0 auto;
@@ -296,7 +520,7 @@ dd {
 
 .contextRow {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px;
 }
 
@@ -579,6 +803,29 @@ input:disabled {
 }
 
 @media (max-width: 980px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+
+  .navRail {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .navActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .appHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .statusDashboard,
+  .coreGrid {
+    grid-template-columns: 1fr;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
@@ -601,6 +848,23 @@ input:disabled {
 }
 
 @media (max-width: 560px) {
+  .appMain {
+    padding: 14px;
+  }
+
+  .navActions,
+  .metricLine {
+    grid-template-columns: 1fr;
+  }
+
+  .metricLine {
+    gap: 4px;
+  }
+
+  .metricLine b {
+    justify-self: start;
+  }
+
   .shell {
     width: min(100% - 24px, 1440px);
     padding-top: 18px;

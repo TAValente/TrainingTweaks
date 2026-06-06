@@ -20,6 +20,8 @@ type AppState = {
   riskFindings?: RiskFinding[];
 };
 
+type TrainingStatus = "de-training" | "productive" | "risky" | "high-risk";
+
 const emptySummary: ActivitySummary = {
   mileageLast7Days: 0,
   mileageLast14Days: 0,
@@ -44,17 +46,36 @@ const emptySummary: ActivitySummary = {
   fastestEfforts: []
 };
 
-const riskSignalDefinitions = [
-  { ruleId: "weekly_volume_growth", label: "Weekly volume growth" },
-  { ruleId: "acwr_mileage", label: "Acute/chronic load" },
-  { ruleId: "consecutive_build_weeks", label: "Build-week streak" },
-  { ruleId: "long_run_percentage", label: "Long-run share" },
-  { ruleId: "long_run_jump", label: "Long-run jump" },
-  { ruleId: "hard_session_count", label: "Hard sessions" },
-  { ruleId: "intensity_spike", label: "Intensity spike" },
-  { ruleId: "hard_day_clustering", label: "Hard-day clustering" },
-  { ruleId: "consecutive_running_days", label: "Run streak" },
-  { ruleId: "training_novelty", label: "Training novelty" }
+const statusScale: TrainingStatus[] = ["de-training", "productive", "risky", "high-risk"];
+
+const dashboardGroups = [
+  {
+    id: "load",
+    label: "Load",
+    rules: [
+      { ruleId: "weekly_volume_growth", label: "Weekly volume" },
+      { ruleId: "acwr_mileage", label: "7d/28d load" },
+      { ruleId: "consecutive_build_weeks", label: "Build weeks" }
+    ]
+  },
+  {
+    id: "intensity",
+    label: "Intensity",
+    rules: [
+      { ruleId: "hard_session_count", label: "Hard sessions" },
+      { ruleId: "intensity_spike", label: "Intensity load" },
+      { ruleId: "hard_day_clustering", label: "Hard-day spacing" }
+    ]
+  },
+  {
+    id: "durability",
+    label: "Durability",
+    rules: [
+      { ruleId: "long_run_percentage", label: "Long-run share" },
+      { ruleId: "long_run_jump", label: "Long-run jump" },
+      { ruleId: "consecutive_running_days", label: "Run streak" }
+    ]
+  }
 ];
 
 export default function Home() {
@@ -289,15 +310,22 @@ export default function Home() {
   const hasUnsavedFeedback =
     Boolean(feedbackSavedAt) &&
     (feedbackNote.trim() !== savedFeedbackNote || feedbackRating !== savedFeedbackRating);
+  const dashboard = buildDashboardGroups(state.riskFindings ?? [], state.summary);
 
   return (
-    <main className="shell">
-      <section className="topbar">
+    <main className="appShell">
+      <aside className="navRail">
         <div>
           <p className="eyebrow">TrainingTweaks</p>
-          <h1>Adapt today&apos;s run without rewriting the whole plan.</h1>
+          <h1>Decision cockpit</h1>
         </div>
-        <div className="actions">
+        <nav>
+          <a className="active" href="/">
+            Today
+          </a>
+          <a href="/model-runs">Model review</a>
+        </nav>
+        <div className="navActions">
           <a className="button secondary" href="/model-runs">
             Review Runs
           </a>
@@ -311,59 +339,55 @@ export default function Home() {
             Log out
           </button>
         </div>
-      </section>
+      </aside>
 
-      <section className="statusLine" aria-live="polite">
-        <span className={state.connected ? "dot connected" : "dot"} />
-        {status}
-      </section>
-      {error ? <section className="errorLine">{error}</section> : null}
+      <section className="appMain">
+        <header className="appHeader">
+          <p className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+          <h2>Training status</h2>
+        </header>
 
-      <section className="grid">
-        <aside className="sidebar">
-          <div className="panel summaryPanel">
-            <h2>Recent Training</h2>
-            <dl className="summaryGrid">
-              <Metric label="7 days" value={`${state.summary.mileageLast7Days} mi`} />
-              <Metric label="14 days" value={`${state.summary.mileageLast14Days} mi`} />
-              <Metric label="28 days" value={`${state.summary.mileageLast28Days} mi`} />
-              <Metric label="Days since run" value={state.summary.daysSinceLastRun ?? "n/a"} />
-              <Metric label="Long run 14d" value={`${state.summary.longestRunLast14DaysMiles} mi`} />
-              <Metric label="Run count 14d" value={state.summary.runCountLast14Days} />
-            </dl>
-            {state.lastRefreshAt ? (
-              <p className="muted">Last refresh {new Date(state.lastRefreshAt).toLocaleString()}</p>
-            ) : (
-              <p className="muted">No Strava refresh yet.</p>
-            )}
-          </div>
-
-          <div className="panel">
-            <h2>Risk Signals</h2>
-            <RiskFindingList findings={state.riskFindings ?? []} summary={state.summary} />
-          </div>
-
-          <div className="panel">
-            <h2>Latest Runs</h2>
-            <div className="activityList">
-              {runs.length === 0 ? (
-                <p className="muted">Runs will appear here after a Strava refresh.</p>
-              ) : (
-                runs.slice(0, 8).map((activity) => (
-                  <div className="activity" key={activity.providerActivityId}>
-                    <div>
-                      <strong>{activity.name ?? activity.sportType}</strong>
-                      <span>{activity.startDate.slice(0, 10)}</span>
-                    </div>
-                    <b>{formatMiles(activity.distanceMeters)}</b>
+        <section className="statusDashboard">
+          {dashboard.map((group) => (
+            <section className={`statusCard ${group.status}`} key={group.id}>
+              <header>
+                <div>
+                  <h3>{group.label}</h3>
+                  <strong>{statusLabel(group.status)}</strong>
+                </div>
+                <p>{group.summary}</p>
+              </header>
+              <div className="statusBars" aria-label={`${group.label} status scale`}>
+                {statusScale.map((status) => (
+                  <span
+                    className={`statusBar ${status} ${status === group.status ? "active" : ""}`}
+                    key={status}
+                    title={statusLabel(status)}
+                  />
+                ))}
+              </div>
+              <div className="metricList">
+                {group.metrics.map((metric) => (
+                  <div className="metricLine" key={metric.ruleId}>
+                    <span className={`metricDot ${metric.severity}`} />
+                    <strong>{metric.label}</strong>
+                    <b>{metric.value}</b>
+                    <small>{metric.detail}</small>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </aside>
+                ))}
+              </div>
+            </section>
+          ))}
+        </section>
 
-        <section className="workspace">
+        <section className="statusLine" aria-live="polite">
+          <span className={state.connected ? "dot connected" : "dot"} />
+          {status}
+        </section>
+        {error ? <section className="errorLine">{error}</section> : null}
+
+        <section className="coreGrid">
+          <section className="workspace">
           <div className="contextRow">
             <label className={isEditingPlan ? "" : "locked"}>
               <span className="fieldHeader">
@@ -550,6 +574,45 @@ export default function Home() {
               </p>
             )}
           </article>
+          </section>
+
+          <aside className="sidebar">
+            <div className="panel summaryPanel">
+              <h2>Recent Training</h2>
+              <dl className="summaryGrid">
+                <Metric label="7 days" value={`${state.summary.mileageLast7Days} mi`} />
+                <Metric label="14 days" value={`${state.summary.mileageLast14Days} mi`} />
+                <Metric label="28 days" value={`${state.summary.mileageLast28Days} mi`} />
+                <Metric label="Days since run" value={state.summary.daysSinceLastRun ?? "n/a"} />
+                <Metric label="Long run 14d" value={`${state.summary.longestRunLast14DaysMiles} mi`} />
+                <Metric label="Run count 14d" value={state.summary.runCountLast14Days} />
+              </dl>
+              {state.lastRefreshAt ? (
+                <p className="muted">Last refresh {new Date(state.lastRefreshAt).toLocaleString()}</p>
+              ) : (
+                <p className="muted">No Strava refresh yet.</p>
+              )}
+            </div>
+
+            <div className="panel">
+              <h2>Latest Runs</h2>
+              <div className="activityList">
+                {runs.length === 0 ? (
+                  <p className="muted">Runs will appear here after a Strava refresh.</p>
+                ) : (
+                  runs.slice(0, 8).map((activity) => (
+                    <div className="activity" key={activity.providerActivityId}>
+                      <div>
+                        <strong>{activity.name ?? activity.sportType}</strong>
+                        <span>{activity.startDate.slice(0, 10)}</span>
+                      </div>
+                      <b>{formatMiles(activity.distanceMeters)}</b>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </aside>
         </section>
       </section>
     </main>
@@ -565,26 +628,27 @@ function Metric({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function RiskFindingList({ findings, summary }: { findings: RiskFinding[]; summary: ActivitySummary }) {
+function buildDashboardGroups(findings: RiskFinding[], summary: ActivitySummary) {
   const signalFindings = findings.filter((finding) => finding.category !== "data_quality");
-
-  return (
-    <div className="riskList">
-      {riskSignalDefinitions.map((definition) => {
-        const finding = strongestFinding(signalFindings.filter((candidate) => candidate.ruleId === definition.ruleId));
-        const severity = finding?.severity === "yellow" || finding?.severity === "red" ? finding.severity : "green";
-        return (
-          <div className="riskItem" key={definition.ruleId}>
-            <span className={`riskDot ${severity}`} aria-label={`${severity} signal`} />
-            <div>
-              <strong>{definition.label}</strong>
-              <p>{riskCalculation(definition.ruleId, finding, summary)}</p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return dashboardGroups.map((group) => {
+    const metrics = group.rules.map((rule) => {
+      const finding = strongestFinding(signalFindings.filter((candidate) => candidate.ruleId === rule.ruleId));
+      return {
+        ...rule,
+        severity: metricSeverity(finding),
+        value: metricValue(rule.ruleId, finding, summary),
+        detail: metricDetail(rule.ruleId, finding, summary),
+        finding
+      };
+    });
+    const status = groupStatus(group.id, metrics);
+    return {
+      ...group,
+      metrics,
+      status,
+      summary: groupSummary(group.id, status)
+    };
+  });
 }
 
 function strongestFinding(findings: RiskFinding[]) {
@@ -597,46 +661,112 @@ function strongestFinding(findings: RiskFinding[]) {
   return findings.sort((left, right) => severityOrder[right.severity] - severityOrder[left.severity])[0];
 }
 
-function riskCalculation(ruleId: string, finding: RiskFinding | undefined, summary: ActivitySummary) {
+function groupStatus(
+  groupId: string,
+  metrics: Array<{ ruleId: string; finding?: RiskFinding; severity: "green" | "yellow" | "red" }>
+): TrainingStatus {
+  if (metrics.some((metric) => metric.severity === "red")) return "high-risk";
+  if (metrics.some((metric) => metric.severity === "yellow")) return "risky";
+  if (groupId === "load" && isLoadDetraining(metrics)) return "de-training";
+  if (groupId === "intensity" && (metrics[0]?.finding?.observedValue ?? 1) === 0) return "de-training";
+  if (groupId === "durability" && (metrics[0]?.finding?.observedValue ?? 1) === 0) return "de-training";
+  return "productive";
+}
+
+function isLoadDetraining(metrics: Array<{ ruleId: string; finding?: RiskFinding }>) {
+  const weeklyGrowth = metrics.find((metric) => metric.ruleId === "weekly_volume_growth")?.finding?.observedValue;
+  const acwr = metrics.find((metric) => metric.ruleId === "acwr_mileage")?.finding?.observedValue;
+  return (weeklyGrowth !== undefined && weeklyGrowth <= -0.2) || (acwr !== undefined && acwr < 0.75);
+}
+
+function groupSummary(groupId: string, status: TrainingStatus) {
+  if (status === "high-risk") {
+    if (groupId === "load") return "Load is outside current guardrails.";
+    if (groupId === "intensity") return "Quality work is clustered too tightly.";
+    return "Durability guardrails are under pressure.";
+  }
+  if (status === "risky") {
+    if (groupId === "load") return "Load is productive but needs attention.";
+    if (groupId === "intensity") return "Quality is useful, but spacing is tight.";
+    return "Durability is usable with one watch item.";
+  }
+  if (status === "de-training") {
+    if (groupId === "load") return "Recent load is below the training baseline.";
+    if (groupId === "intensity") return "Quality stimulus is currently low.";
+    return "Durability stimulus is currently light.";
+  }
+  if (groupId === "load") return "Volume is building without a spike.";
+  if (groupId === "intensity") return "Quality work is within current guardrails.";
+  return "Long run and streak support the build.";
+}
+
+function statusLabel(status: TrainingStatus) {
+  if (status === "de-training") return "De-training";
+  if (status === "high-risk") return "High risk";
+  return status[0].toUpperCase() + status.slice(1);
+}
+
+function metricSeverity(finding: RiskFinding | undefined): "green" | "yellow" | "red" {
+  if (finding?.severity === "red") return "red";
+  if (finding?.severity === "yellow") return "yellow";
+  return "green";
+}
+
+function metricValue(ruleId: string, finding: RiskFinding | undefined, summary: ActivitySummary) {
   if (finding) {
     const observed = finding.observedValue;
-    const threshold = finding.thresholdValue;
-    if (ruleId === "weekly_volume_growth") return ratioLine("7d growth", observed, threshold);
-    if (ruleId === "acwr_mileage") return numberLine("7d / baseline", observed, threshold, "x");
-    if (ruleId === "consecutive_build_weeks") return countLine("build weeks", observed, threshold);
-    if (ruleId === "long_run_percentage") return ratioLine("long run share", observed, threshold);
-    if (ruleId === "long_run_jump") return ratioLine("long run change", observed, threshold);
-    if (ruleId === "hard_session_count") return countLine("hard sessions", observed, threshold);
-    if (ruleId === "intensity_spike") return ratioLine(`${finding.evidence.proxy ?? "load"} change`, observed, threshold);
-    if (ruleId === "hard_day_clustering") return countLine("hard sessions checked", observed, threshold);
-    if (ruleId === "consecutive_running_days") return countLine("day streak", observed, threshold);
-    if (ruleId === "training_novelty") return countLine("novelty points", observed, threshold);
+    if (ruleId === "weekly_volume_growth") return observed === undefined ? "n/a" : signedPercent(observed);
+    if (ruleId === "acwr_mileage") return observed === undefined ? "n/a" : `${round2(observed)}x`;
+    if (ruleId === "consecutive_build_weeks") return `${observed ?? "n/a"}`;
+    if (ruleId === "long_run_percentage") return observed === undefined ? "n/a" : `${Math.round(observed * 100)}%`;
+    if (ruleId === "long_run_jump") return observed === undefined ? "n/a" : signedPercent(observed);
+    if (ruleId === "hard_session_count") return `${observed ?? "n/a"} / 7d`;
+    if (ruleId === "intensity_spike") return observed === undefined ? "n/a" : signedPercent(observed);
+    if (ruleId === "hard_day_clustering") return observed === undefined ? "checked" : `${observed} hard`;
+    if (ruleId === "consecutive_running_days") return `${observed ?? "n/a"} days`;
   }
 
-  if (ruleId === "weekly_volume_growth") return `${summary.mileageLast7Days} mi in 7d`;
-  if (ruleId === "acwr_mileage") return `${summary.mileageLast7Days} mi / 7d, ${summary.mileageLast28Days} mi / 28d`;
-  if (ruleId === "long_run_percentage") return `${summary.longestRunLast14DaysMiles} mi long run, ${summary.mileageLast7Days} mi / 7d`;
+  if (ruleId === "weekly_volume_growth") return `${summary.mileageLast7Days} mi / 7d`;
+  if (ruleId === "acwr_mileage") return `${summary.mileageLast28Days} mi / 28d`;
+  if (ruleId === "long_run_percentage") return `${summary.longestRunLast14DaysMiles} mi`;
   if (ruleId === "hard_session_count" || ruleId === "intensity_spike") {
-    return `${summary.recentIntensityIndicators.length} recent intensity indicators`;
+    return `${summary.recentIntensityIndicators.length}`;
   }
 
-  return "Waiting on enough stored running history";
+  return "n/a";
 }
 
-function ratioLine(label: string, observed?: number, threshold?: number) {
-  return `${label}: ${observed === undefined ? "n/a" : `${Math.round(observed * 100)}%`}${
-    threshold === undefined ? "" : ` / ${Math.round(threshold * 100)}%`
-  }`;
+function metricDetail(ruleId: string, finding: RiskFinding | undefined, summary: ActivitySummary) {
+  if (finding) {
+    if (ruleId === "weekly_volume_growth") return "vs prior week";
+    if (ruleId === "acwr_mileage") return "7d vs 28d baseline";
+    if (ruleId === "consecutive_build_weeks") return "consecutive increases";
+    if (ruleId === "long_run_percentage") return `${summary.longestRunLast14DaysMiles} mi of ${summary.mileageLast7Days} mi`;
+    if (ruleId === "long_run_jump") return "vs prior 4-week avg";
+    if (ruleId === "hard_session_count") return "inferred hard runs";
+    if (ruleId === "intensity_spike") return `${finding.evidence.proxy ?? "load"} proxy`;
+    if (ruleId === "hard_day_clustering") return finding.severity === "green" ? "no cluster detected" : "cluster pattern";
+    if (ruleId === "consecutive_running_days") return "current streak";
+  }
+
+  if (ruleId === "weekly_volume_growth") return "waiting on prior week";
+  if (ruleId === "acwr_mileage") return "waiting on baseline";
+  if (ruleId === "consecutive_build_weeks") return "waiting on week history";
+  if (ruleId === "long_run_percentage") return "waiting on weekly mileage";
+  if (ruleId === "long_run_jump") return "waiting on long-run baseline";
+  if (ruleId === "hard_session_count") return "waiting on classification";
+  if (ruleId === "intensity_spike") return "waiting on effort baseline";
+  if (ruleId === "hard_day_clustering") return "waiting on hard sessions";
+  return "waiting on run streak";
 }
 
-function numberLine(label: string, observed?: number, threshold?: number, unit = "") {
-  return `${label}: ${observed === undefined ? "n/a" : `${observed}${unit}`}${
-    threshold === undefined ? "" : ` / ${threshold}${unit}`
-  }`;
+function signedPercent(value: number) {
+  const rounded = Math.round(value * 100);
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
 }
 
-function countLine(label: string, observed?: number, threshold?: number) {
-  return `${label}: ${observed ?? "n/a"}${threshold === undefined ? "" : ` / ${threshold}`}`;
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function Markdownish({ text }: { text: string }) {

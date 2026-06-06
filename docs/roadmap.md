@@ -77,14 +77,29 @@ Move from pasted plan context toward structured plan interpretation.
 
 Scope:
 
+- start with a small, actionable library of known plan families and common variants
 - support uploaded or pasted plan blocks
 - identify planned workout intent
 - distinguish quality, easy, long run, recovery, and rest days
+- map plan prescriptions to expected weekly load, long-run progression, and workout density
 - preserve the plan's style and aggressiveness
 
 TrainingTweaks should adapt the user's existing plan instead of creating a new one.
 
-## 6. External Context
+## 6. Forward Projection and Option Comparison
+
+Project deterministic progress and risk metrics forward so runners can compare reasonable choices before committing.
+
+Scope:
+
+- estimate how one option versus another changes weekly load, acute/chronic load, long-run share, intensity density, and recovery spacing
+- show whether a proposed option points toward de-training, productive, risky, or high-risk territory
+- keep projections explainable and lightweight rather than pretending to forecast injury or fitness precisely
+- use structured plans as the baseline once plan understanding is mature enough
+
+TrainingTweaks should make tradeoffs visible: not just "what should I do today?", but "what does this choice make more likely over the next few days?"
+
+## 7. External Context
 
 Add contextual signals that materially change recommendations.
 
@@ -98,7 +113,7 @@ Candidates:
 
 These should be added only when they improve decisions enough to justify the extra complexity.
 
-## 7. Managed Agent Workflow Consideration
+## 8. Managed Agent Workflow Consideration
 
 Consider a managed agent or Agents SDK workflow only after logged model runs and feedback reveal failure modes that a single model call cannot reliably handle.
 
@@ -119,7 +134,7 @@ Adoption criteria:
 
 Default posture: keep the chat path as a simple deterministic context builder plus one model judgment call until evidence justifies agent orchestration.
 
-## 8. Self-Service Authentication
+## 9. Self-Service Authentication
 
 Move beyond configured environment-variable users when TrainingTweaks is ready for broader use.
 
