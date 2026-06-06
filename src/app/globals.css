@@ -197,6 +197,59 @@ dd {
   color: var(--muted);
 }
 
+.riskList {
+  display: grid;
+  gap: 10px;
+}
+
+.riskItem {
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr;
+  padding: 10px;
+}
+
+.riskItem strong {
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 3px;
+}
+
+.riskItem p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.riskBadge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 4px 7px;
+  text-transform: uppercase;
+}
+
+.riskBadge.yellow {
+  border-color: rgba(180, 83, 9, 0.35);
+  color: var(--warm);
+}
+
+.riskBadge.red {
+  border-color: #f3b4a8;
+  color: #8f2f1f;
+}
+
+.riskBadge.green {
+  border-color: rgba(15, 118, 110, 0.32);
+  color: var(--accent-dark);
+}
+
 .activityList {
   display: grid;
   gap: 8px;

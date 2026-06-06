@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trainingPlanProfiles } from "@/lib/training-plans";
-import type { Activity, ActivitySummary, TrainingContext, TrainingPlanSource } from "@/lib/types";
+import type { Activity, ActivitySummary, RiskFinding, TrainingContext, TrainingPlanSource } from "@/lib/types";
 
 type AppState = {
   connected: boolean;
@@ -10,6 +10,7 @@ type AppState = {
   activities: Activity[];
   context?: TrainingContext;
   summary: ActivitySummary;
+  riskFindings?: RiskFinding[];
 };
 
 const emptySummary: ActivitySummary = {
@@ -126,7 +127,8 @@ export default function Home() {
         connected: true,
         lastRefreshAt: payload.refreshedAt,
         activities: payload.activities,
-        summary: payload.summary
+        summary: payload.summary,
+        riskFindings: payload.riskFindings
       }));
       setStatus(`Imported ${payload.importedCount} recent Strava activities.`);
     } catch (error) {
@@ -314,6 +316,11 @@ export default function Home() {
             ) : (
               <p className="muted">No Strava refresh yet.</p>
             )}
+          </div>
+
+          <div className="panel">
+            <h2>Risk Signals</h2>
+            <RiskFindingList findings={state.riskFindings ?? []} />
           </div>
 
           <div className="panel">
@@ -534,6 +541,30 @@ function Metric({ label, value }: { label: string; value: string | number }) {
     <div>
       <dt>{label}</dt>
       <dd>{value}</dd>
+    </div>
+  );
+}
+
+function RiskFindingList({ findings }: { findings: RiskFinding[] }) {
+  const visibleFindings = findings
+    .filter((finding) => finding.severity !== "info")
+    .slice(0, 6);
+
+  if (!visibleFindings.length) {
+    return <p className="muted">No elevated deterministic risk signals from stored running history.</p>;
+  }
+
+  return (
+    <div className="riskList">
+      {visibleFindings.map((finding, index) => (
+        <div className="riskItem" key={`${finding.id}-${index}`}>
+          <span className={`riskBadge ${finding.severity}`}>{finding.severity}</span>
+          <div>
+            <strong>{finding.title}</strong>
+            <p>{finding.message}</p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

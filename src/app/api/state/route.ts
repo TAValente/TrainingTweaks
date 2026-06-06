@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authCookieName, getRequestUser } from "@/lib/auth";
 import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
+import { computeRiskFindings } from "@/lib/risk";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -18,7 +19,8 @@ export async function GET(request: NextRequest) {
       lastRefreshAt: data.lastRefreshAt,
       activities: data.activities.slice(0, 20),
       context: data.context,
-      summary: buildActivitySummary(data.activities)
+      summary: buildActivitySummary(data.activities),
+      riskFindings: computeRiskFindings({ activities: data.activities })
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load app state.";
