@@ -162,6 +162,7 @@ export type StructuredTrainingPlan = {
   source: "user_import" | "manual" | "trainingtweaks_generic";
   sourceNotes?: string;
   raceDistance?: "5k" | "10k" | "half_marathon" | "marathon";
+  startDate?: string;
   durationWeeks: number;
   currentWeek?: number;
   currentDay?: TrainingPlanDayOfWeek;

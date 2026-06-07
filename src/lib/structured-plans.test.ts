@@ -74,3 +74,16 @@ test("empty summary is explicit when no structured plan has been imported", () =
   assert.equal(structuredPlanSnapshot(undefined), undefined);
   assert.equal(structuredPlanSummary(undefined), "No structured plan imported yet.");
 });
+
+test("snapshot exposes calendar anchored plan start", () => {
+  const snapshot = structuredPlanSnapshot({
+    ...importedPlanFixture,
+    startDate: "2099-01-05",
+    currentWeek: undefined,
+    currentDay: undefined
+  });
+
+  assert.equal(snapshot?.startDate, "2099-01-05");
+  assert.equal(snapshot?.currentWeek, 1);
+  assert.equal(snapshot?.currentDay, "monday");
+});

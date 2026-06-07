@@ -18,6 +18,7 @@ export type StarterMarathonPlanInput = {
   targetMilesPerWeek?: number;
   durationWeeks: number;
   riskTolerance: MarathonPlanRiskTolerance;
+  startDate?: string;
 };
 
 type RiskProfile = {
@@ -125,6 +126,7 @@ export function buildStarterMarathonPlan(input: StarterMarathonPlanInput): Struc
   const requestedTargetMilesPerWeek = round1(Math.max(currentMilesPerWeek, input.targetMilesPerWeek ?? currentMilesPerWeek));
   const durationWeeks = clamp(Math.round(input.durationWeeks), 8, 24);
   const riskTolerance = input.riskTolerance;
+  const startDate = normalizeDate(input.startDate);
   const toleranceConfig = riskToleranceConfigs[riskTolerance];
   const riskBudget = buildRiskBudget(riskTolerance, durationWeeks, toleranceConfig);
   const { weeks, targetMilesPerWeek, riskAssessments, riskCounts } = buildPlanWithinBudget({
@@ -143,6 +145,7 @@ export function buildStarterMarathonPlan(input: StarterMarathonPlanInput): Struc
     source: "trainingtweaks_generic",
     sourceNotes: "Deterministic generic marathon scaffold generated from current mileage, target mileage, plan length, and planned-risk tolerance.",
     raceDistance: "marathon",
+    startDate,
     durationWeeks,
     currentWeek: 1,
     currentDay: "monday",
@@ -485,4 +488,13 @@ function round1(value: number) {
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+function normalizeDate(value: string | undefined) {
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date();
+  const day = date.getDay();
+  const daysUntilMonday = (8 - day) % 7 || 7;
+  date.setDate(date.getDate() + daysUntilMonday);
+  return date.toISOString().slice(0, 10);
 }
