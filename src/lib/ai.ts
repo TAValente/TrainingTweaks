@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOptionalEnv, getRequiredEnv } from "./env";
-import { structuredPlanSnapshot } from "./structured-plans";
 import { contextForPrompt } from "./summary";
 import type { Activity, JsonObject, JsonValue, TrainingContext } from "./types";
 
@@ -167,7 +166,7 @@ Plan context:
 ${trainingContext.planContext?.trim() || "Not provided"}
 
 Structured plan:
-${JSON.stringify(structuredPlanSnapshot(trainingContext.structuredPlan) ?? "Not provided", null, 2)}
+${JSON.stringify(structuredPlanFromRunningContext(runningContext) ?? "Not provided", null, 2)}
 
 Goals context:
 ${trainingContext.goalsContext?.trim() || "Not provided"}
@@ -178,6 +177,11 @@ ${trainingContext.subjectiveContext?.trim() || "Not provided"}
 TRAINING DATA
 
 ${JSON.stringify(runningContext, null, 2)}`;
+}
+
+function structuredPlanFromRunningContext(runningContext: unknown) {
+  if (!runningContext || typeof runningContext !== "object") return undefined;
+  return (runningContext as { structuredTrainingPlan?: unknown }).structuredTrainingPlan;
 }
 
 function extractText(payload: OpenAIResponse) {

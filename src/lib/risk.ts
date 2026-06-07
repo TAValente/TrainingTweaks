@@ -18,6 +18,8 @@ import type {
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const metersPerMile = 1609.344;
 
+// Rough v1 capacity heuristics only. Strava detailed best efforts are partial evidence
+// because they exist only for enriched activities, and they never override adaptation.
 const capacityBestEffortTargets = [
   { distance: "1 mile" as const, meters: 1609.344, highSeconds: 6.5 * 60, moderateSeconds: 8.5 * 60 },
   { distance: "5K" as const, meters: 5000, highSeconds: 22 * 60, moderateSeconds: 28 * 60 },
@@ -349,7 +351,7 @@ function capacityContext(runs: Activity[], asOfDate: Date): CapacityContext {
   const classification = strongerCapacityClass(activityClass, bestEffortClass);
   return {
     source: "strava_activity",
-    confidence: runs1825.length >= 20 || fastestEfforts.length ? "medium" : "low",
+    confidence: runs1825.length >= 20 ? "medium" : "low",
     historicalPeakWeeklyMileage: round1(peakWeekly),
     historicalLongRunMiles: round1(longRun),
     durableMileagePerWeek: round1(durableMileagePerWeek),

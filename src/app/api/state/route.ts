@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { activitiesForClient } from "@/lib/activity-serialization";
 import { authCookieName, getRequestUser } from "@/lib/auth";
+import { defaultTimeZone, localDateParts } from "@/lib/calendar";
 import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
 import { computeRiskFindings } from "@/lib/risk";
@@ -15,7 +16,10 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Login required." }, { status: 401 });
 
     const data = await getData(user.id);
-    const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredPlanSnapshot(data.context?.structuredPlan));
+    const today = localDateParts(new Date(), defaultTimeZone);
+    const plannedWorkout = plannedWorkoutExposureFromSnapshot(
+      structuredPlanSnapshot(data.context?.structuredPlan, { localDate: today.date })
+    );
     return NextResponse.json({
       user,
       connected: Boolean(data.strava),

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { activitiesForClient } from "@/lib/activity-serialization";
 import { authCookieName, getRequestUser } from "@/lib/auth";
+import { defaultTimeZone, localDateParts } from "@/lib/calendar";
 import {
   fetchDetailedRunActivities,
   fetchRecentStravaActivities,
@@ -43,7 +44,10 @@ export async function POST(request: NextRequest) {
   if (streamActivities.length) {
     activities = await saveActivities(user.id, streamActivities);
   }
-  const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredPlanSnapshot(data.context?.structuredPlan));
+  const today = localDateParts(new Date(), defaultTimeZone);
+  const plannedWorkout = plannedWorkoutExposureFromSnapshot(
+    structuredPlanSnapshot(data.context?.structuredPlan, { localDate: today.date })
+  );
 
   return NextResponse.json({
     refreshedAt: new Date().toISOString(),

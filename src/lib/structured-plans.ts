@@ -1,8 +1,12 @@
 import type { PlannedWorkoutExposure, StructuredTrainingPlan, TrainingPlanDayOfWeek } from "./types";
 
-export function structuredPlanSnapshot(plan?: StructuredTrainingPlan) {
+export type StructuredPlanSnapshotOptions = {
+  localDate?: string;
+};
+
+export function structuredPlanSnapshot(plan?: StructuredTrainingPlan, options: StructuredPlanSnapshotOptions = {}) {
   if (!plan) return undefined;
-  const calendarPosition = calendarPlanPosition(plan);
+  const calendarPosition = calendarPlanPosition(plan, options);
   const currentWeek = clampWeek(calendarPosition?.weekNumber ?? plan.currentWeek ?? 1, plan.durationWeeks);
   const currentDay = calendarPosition?.dayOfWeek ?? plan.currentDay ?? "monday";
   const week = plan.weeks.find((candidate) => candidate.weekNumber === currentWeek);
@@ -81,12 +85,12 @@ function clampWeek(value: number, durationWeeks: number) {
   return Math.min(durationWeeks, Math.max(1, Math.round(value)));
 }
 
-function calendarPlanPosition(plan: StructuredTrainingPlan) {
+function calendarPlanPosition(plan: StructuredTrainingPlan, options: StructuredPlanSnapshotOptions) {
   if (!plan.startDate) return undefined;
   const start = parseIsoDate(plan.startDate);
   if (!start) return undefined;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = options.localDate ? parseIsoDate(options.localDate) : localToday();
+  if (!today) return undefined;
   const deltaDays = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
   if (deltaDays < 0) return { weekNumber: 1, dayOfWeek: "monday" as TrainingPlanDayOfWeek };
   return {
@@ -105,6 +109,12 @@ function parseIsoDate(value: string) {
 
 function dayOfWeekFromIndex(index: number): TrainingPlanDayOfWeek {
   return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"][index] as TrainingPlanDayOfWeek;
+}
+
+function localToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 }
 
 function plannedExposureSource(source: StructuredTrainingPlan["source"] | undefined): PlannedWorkoutExposure["source"] {

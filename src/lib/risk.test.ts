@@ -179,6 +179,7 @@ test("capacity includes best-effort summaries when available", () => {
   const finding = assertFinding(findings, "capacity_context");
   assert.equal(finding.framework?.capacity?.fastestEfforts?.[0]?.distance, "5K");
   assert.equal(finding.framework?.capacity?.fastestEfforts?.[0]?.seconds, 1200);
+  assert.equal(finding.framework?.capacity?.confidence, "low");
 });
 
 test("strong old best effort can raise capacity while adaptation stays low", () => {
@@ -196,6 +197,7 @@ test("strong old best effort can raise capacity while adaptation stays low", () 
   const finding = assertFinding(findings, "adaptation_context");
   assert.equal(finding.framework?.capacity?.classification, "high");
   assert.equal(finding.framework?.adaptation?.classification, "low");
+  assert.equal(finding.framework?.adaptation?.mileagePerWeek28Days, 0.8);
 });
 
 function assertFinding(findings: RiskFinding[], ruleId: string) {
