@@ -548,6 +548,32 @@ label span {
   gap: 8px;
 }
 
+.planBuilder {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.planControlGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.planSnapshot {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  margin: 0;
+  padding: 9px 10px;
+}
+
 .miniButton {
   border: 1px solid var(--accent);
   border-radius: 8px;

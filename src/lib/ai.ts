@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOptionalEnv, getRequiredEnv } from "./env";
+import { structuredPlanSnapshot } from "./structured-plans";
 import { contextForPrompt } from "./summary";
 import type { Activity, JsonObject, JsonValue, TrainingContext } from "./types";
 
@@ -164,6 +165,9 @@ ${trainingContext.planVariant?.trim() || "Not provided"}
 
 Plan context:
 ${trainingContext.planContext?.trim() || "Not provided"}
+
+Structured plan:
+${JSON.stringify(structuredPlanSnapshot(trainingContext.structuredPlan) ?? "Not provided", null, 2)}
 
 Goals context:
 ${trainingContext.goalsContext?.trim() || "Not provided"}

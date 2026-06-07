@@ -1,5 +1,6 @@
 import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
 import { computeRiskFindings } from "./risk";
+import { structuredPlanSnapshot } from "./structured-plans";
 
 const metersPerMile = 1609.344;
 const defaultTimeZone = "America/New_York";
@@ -124,6 +125,7 @@ export function contextForPrompt(
       source: context.planSource || "unknown",
       variant: context.planVariant || "Not provided"
     },
+    structuredTrainingPlan: structuredPlanSnapshot(context.structuredPlan),
     planContext: context.planContext || "Not provided",
     goalsContext: context.goalsContext || "Not provided",
     subjectiveContext: context.subjectiveContext || "Not provided",

@@ -28,6 +28,7 @@ Key engineering rule: deterministic systems should calculate facts and risk sign
 - Incrementally enrich run activities with Strava detailed best efforts.
 - Show a compact recent activity summary.
 - Select a known plan family such as Hal Higdon, Jack Daniels, Pfitzinger, Hansons, NRC, FIRST, McMillan, generic, or custom.
+- Store structured plan context when a runner-provided plan has been imported.
 - Paste optional plan, goal, and subjective context.
 - Require configured user login before exposing the app or API routes.
 - Ask a running adaptation question in chat.
@@ -100,7 +101,7 @@ This workspace also supports `local.env` for local-only secrets because the orig
 
 ## App State Storage
 
-TrainingTweaks stores tokens, activities, saved context, and model run logs in per-user JSON app state.
+TrainingTweaks stores tokens, activities, saved context, structured plan context, and model run logs in per-user JSON app state.
 
 For Vercel or mobile-access deployments, set `DATABASE_URL` to your Supabase Postgres connection string. The app will create the `trainingtweaks_app_state` table automatically on first read/write. Each user gets a separate JSON app state row keyed as `user:<id>`.
 
@@ -117,6 +118,14 @@ Recent retained runs can be inspected with `GET /api/model-runs`; pass `?limit=1
 TrainingTweaks computes V1 running risk findings with a parameterized rules engine in `src/lib/risk.ts`. The engine emits individual explainable findings, not a single injury prediction score, and preserves runner agency by using neutral messages such as "Longest run was 42% of weekly mileage."
 
 Findings are included in `/api/state`, Strava refresh responses, the main UI sidebar, and the structured running context sent to the model. Thresholds, windows, confidence labels, severities, and enabled flags live in the default risk config so they can be tuned later or adapted per runner.
+
+## Structured Training Plans
+
+Structured plan data is stored inside the existing per-user app state JSON. The current schema represents runner-provided imported plans as weeks, days, workout types, mileage or duration targets, intensity, and purpose. Named plan families are treated as metadata and adaptation guidance unless the user supplies their own plan details.
+
+TrainingTweaks also includes a deterministic generic marathon scaffold generated from current miles per week, target or max miles per week, plan length, and low/regular/high risk tolerance. Risk tolerance is parameterized as a planned-risk budget: low allows no scheduled yellow or red findings, regular allows limited yellow findings and no red findings, and high allows more yellow findings with a small red allowance. The starter marathon generator only schedules recovery runs, workout placeholders, and long runs for now; workout details are intentionally left to be chosen later.
+
+This keeps the app ready for plan-aware projections while avoiding app-shipped copies of popular published programs. The intended third-party path is bring-your-own-plan import, while TrainingTweaks-authored generic plans can be designed collaboratively inside the product.
 
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.
 

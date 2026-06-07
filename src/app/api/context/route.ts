@@ -15,6 +15,7 @@ export async function PUT(request: NextRequest) {
     planSource: body.planSource ?? current.context?.planSource,
     planVariant: body.planVariant?.trim(),
     planContext: body.planContext?.trim(),
+    structuredPlan: body.structuredPlan,
     goalsContext: body.goalsContext?.trim(),
     subjectiveContext: body.subjectiveContext?.trim() ?? current.context?.subjectiveContext
   };
