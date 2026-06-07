@@ -3,11 +3,13 @@ import { authCookieName, getRequestUser } from "@/lib/auth";
 import {
   fetchDetailedRunActivities,
   fetchRecentStravaActivities,
+  fetchRunActivityStreams,
   refreshTokensIfNeeded
 } from "@/lib/strava";
 import { getData, saveActivities, saveStravaTokens } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
 import { computeRiskFindings } from "@/lib/risk";
+import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "@/lib/structured-plans";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -35,15 +37,22 @@ export async function POST(request: NextRequest) {
   if (detailSync.activities.length) {
     activities = await saveActivities(user.id, detailSync.activities);
   }
+  const streamSync = await fetchRunActivityStreams(tokens.accessToken, activities);
+  const { activities: streamActivities, ...streamSyncSummary } = streamSync;
+  if (streamActivities.length) {
+    activities = await saveActivities(user.id, streamActivities);
+  }
+  const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredPlanSnapshot(data.context?.structuredPlan));
 
   return NextResponse.json({
     refreshedAt: new Date().toISOString(),
     importedCount: newActivities.length,
     detailedRunCount: detailSync.syncedCount,
     detailedRunRemainingThisBatch: detailSync.remainingCount,
+    streamSync: streamSyncSummary,
     totalCount: activities.length,
     activities: activities.slice(0, 20),
     summary: buildActivitySummary(activities),
-    riskFindings: computeRiskFindings({ activities })
+    riskFindings: computeRiskFindings({ activities, plannedWorkout })
   });
 }

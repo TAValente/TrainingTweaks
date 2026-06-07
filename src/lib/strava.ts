@@ -1,4 +1,11 @@
-import type { Activity, BestEffort, StravaTokenSet } from "./types";
+import type {
+  Activity,
+  ActivityStreams,
+  ActivityStreamSummary,
+  BestEffort,
+  StravaStreamType,
+  StravaTokenSet
+} from "./types";
 import { getOptionalEnv, getRequiredEnv } from "./env";
 
 type StravaActivity = {
@@ -25,6 +32,28 @@ type StravaBestEffort = {
   moving_time?: number;
   elapsed_time?: number;
   start_date?: string;
+};
+
+type StravaStream = {
+  type: StravaStreamType;
+  data?: Array<number | boolean | [number, number]>;
+  series_type?: string;
+  original_size?: number;
+  resolution?: string;
+};
+
+export type StravaStreamSyncMode = "full" | "selective" | "off";
+
+export type StravaStreamSyncResult = {
+  activities: Activity[];
+  attemptedCount: number;
+  fetchedCount: number;
+  failedCount: number;
+  unavailableCount: number;
+  skippedCount: number;
+  rateLimited: boolean;
+  remainingCount: number;
+  mode: StravaStreamSyncMode;
 };
 
 type StravaTokenResponse = {
@@ -169,6 +198,190 @@ export async function fetchDetailedRunActivities(
   };
 }
 
+export async function fetchRunActivityStreams(
+  accessToken: string,
+  activities: Activity[]
+): Promise<StravaStreamSyncResult> {
+  const mode = streamSyncMode();
+  if (mode === "off") {
+    return emptyStreamSyncResult(mode, activities.filter(isRun).length);
+  }
+
+  const limit = streamSyncLimit(mode);
+  const easyPaceSecondsPerKm = easyPaceBaseline(activities);
+  const candidates = activities
+    .filter(isRun)
+    .filter((activity) => shouldAttemptStreamSync(activity, mode))
+    .sort(byNewestStartDate)
+    .slice(0, limit);
+  const enriched: Activity[] = [];
+  let attemptedCount = 0;
+  let fetchedCount = 0;
+  let failedCount = 0;
+  let unavailableCount = 0;
+  let rateLimited = false;
+
+  for (const activity of candidates) {
+    attemptedCount += 1;
+    const attemptedAt = new Date().toISOString();
+    try {
+      const streams = await fetchStravaActivityStreams(accessToken, activity.providerActivityId);
+      const normalizedStreams = normalizeStreams(streams);
+      const streamTypes = Object.keys(normalizedStreams) as StravaStreamType[];
+      if (!streamTypes.length) {
+        unavailableCount += 1;
+        enriched.push({
+          ...activity,
+          streamSync: {
+            status: "unavailable",
+            mode,
+            attemptedAt,
+            failedAt: attemptedAt,
+            unavailableReason: "Strava returned no streams for this activity.",
+            streamTypes: []
+          }
+        });
+        continue;
+      }
+
+      fetchedCount += 1;
+      enriched.push({
+        ...activity,
+        streams: normalizedStreams,
+        streamSummary: summarizeStravaActivityStreams(normalizedStreams, easyPaceSecondsPerKm),
+        streamSync: {
+          status: "fetched",
+          mode,
+          attemptedAt,
+          fetchedAt: attemptedAt,
+          streamTypes
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown stream sync error.";
+      if (message.includes("429")) {
+        rateLimited = true;
+        enriched.push({
+          ...activity,
+          streamSync: {
+            status: "rate_limited",
+            mode,
+            attemptedAt,
+            failedAt: attemptedAt,
+            failureReason: message
+          }
+        });
+        break;
+      }
+      failedCount += 1;
+      enriched.push({
+        ...activity,
+        streamSync: {
+          status: "failed",
+          mode,
+          attemptedAt,
+          failedAt: attemptedAt,
+          failureReason: message
+        }
+      });
+    }
+  }
+
+  const remainingCount = Math.max(0, activities.filter(isRun).filter((activity) => shouldAttemptStreamSync(activity, mode)).length - attemptedCount);
+  return {
+    activities: enriched,
+    attemptedCount,
+    fetchedCount,
+    failedCount,
+    unavailableCount,
+    skippedCount: Math.max(0, activities.filter(isRun).length - candidates.length),
+    rateLimited,
+    remainingCount,
+    mode
+  };
+}
+
+export async function fetchStravaActivityStreams(
+  accessToken: string,
+  providerActivityId: string,
+  keys: StravaStreamType[] = ["time", "distance", "velocity_smooth", "moving", "heartrate", "cadence", "altitude", "grade_smooth"]
+) {
+  const params = new URLSearchParams({
+    keys: keys.join(","),
+    key_by_type: "true"
+  });
+  const response = await fetch(`https://www.strava.com/api/v3/activities/${providerActivityId}/streams?${params}`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Strava activity streams fetch failed: ${response.status} ${await response.text()}`);
+  }
+
+  return response.json() as Promise<Partial<Record<StravaStreamType, StravaStream>>>;
+}
+
+export function summarizeStravaActivityStreams(
+  streams: Partial<Record<StravaStreamType, Pick<StravaStream, "data" | "type" | "series_type" | "original_size" | "resolution">>>,
+  easyPaceSecondsPerKm?: number
+): ActivityStreamSummary {
+  const time = numericStream(streams.time);
+  const velocity = numericStream(streams.velocity_smooth);
+  const moving = booleanStream(streams.moving);
+  const grade = numericStream(streams.grade_smooth);
+  const distance = numericStream(streams.distance);
+  const availableTypes = Object.keys(streams) as StravaStreamType[];
+  const fastVelocityMetersPerSecond = easyPaceSecondsPerKm ? 1000 / (easyPaceSecondsPerKm * 0.9) : undefined;
+  let fastRunningSeconds = 0;
+  let movingSeconds = 0;
+  let downhillMeters = 0;
+  let sharpPaceChangeCount = 0;
+
+  for (let index = 1; index < time.length; index += 1) {
+    const seconds = Math.max(0, time[index] - time[index - 1]);
+    const isMoving = moving[index] !== false;
+    if (isMoving) movingSeconds += seconds;
+    if (isMoving && fastVelocityMetersPerSecond && (velocity[index] ?? 0) >= fastVelocityMetersPerSecond) {
+      fastRunningSeconds += seconds;
+    }
+    if (isMoving && (grade[index] ?? 0) <= -3 && distance[index] !== undefined && distance[index - 1] !== undefined) {
+      downhillMeters += Math.max(0, distance[index] - distance[index - 1]);
+    }
+    if (Math.abs((velocity[index] ?? 0) - (velocity[index - 1] ?? 0)) >= 1.2) {
+      sharpPaceChangeCount += 1;
+    }
+  }
+
+  return {
+    source: "strava_streams",
+    fetchedAt: new Date().toISOString(),
+    availableTypes,
+    sampleCount: time.length || velocity.length || distance.length,
+    movingSeconds: movingSeconds || undefined,
+    fastRunningSeconds: fastVelocityMetersPerSecond ? Math.round(fastRunningSeconds) : undefined,
+    fastRunningSource: fastVelocityMetersPerSecond ? "personalized_stream_zone" : undefined,
+    fastRunningConfidence: fastVelocityMetersPerSecond ? "medium" : "low",
+    downhillMeters: Math.round(downhillMeters) || undefined,
+    sharpPaceChangeCount: sharpPaceChangeCount || undefined
+  };
+}
+
+function normalizeStreams(streams: Partial<Record<StravaStreamType, StravaStream>>): ActivityStreams {
+  return Object.fromEntries(
+    Object.entries(streams).flatMap(([key, stream]) => {
+      if (!stream?.data?.length) return [];
+      return [[key, {
+        type: stream.type ?? key,
+        data: stream.data,
+        seriesType: stream.series_type,
+        originalSize: stream.original_size,
+        resolution: stream.resolution
+      }]];
+    })
+  ) as ActivityStreams;
+}
+
 function mapTokenResponse(tokens: StravaTokenResponse): StravaTokenSet {
   return {
     accessToken: tokens.access_token,
@@ -222,6 +435,76 @@ function normalizeBestEfforts(bestEfforts?: StravaBestEffort[]): BestEffort[] | 
     .filter((effort) => effort.distanceMeters > 0);
 
   return normalized?.length ? normalized : undefined;
+}
+
+function streamSyncMode(): StravaStreamSyncMode {
+  const mode = getOptionalEnv("STRAVA_STREAM_SYNC_MODE", "full");
+  if (mode === "off" || mode === "selective") return mode;
+  return "full";
+}
+
+function streamSyncLimit(mode: StravaStreamSyncMode) {
+  const fallback = mode === "full" ? "150" : "30";
+  const parsed = Number(getOptionalEnv("STRAVA_STREAM_SYNC_LIMIT", fallback));
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : Number(fallback);
+}
+
+function shouldAttemptStreamSync(activity: Activity, mode: StravaStreamSyncMode) {
+  if (activity.streamSync?.status === "fetched" && activity.streams && activity.streamSummary) return false;
+  if (activity.streamSync?.status === "unavailable") return false;
+  if (mode === "selective" && !isLikelyStreamCandidate(activity)) return false;
+  return true;
+}
+
+function isLikelyStreamCandidate(activity: Activity) {
+  const name = activity.name?.toLowerCase() ?? "";
+  return ["workout", "race", "tempo", "threshold", "interval", "speed", "fartlek", "long"].some((keyword) => name.includes(keyword));
+}
+
+function emptyStreamSyncResult(mode: StravaStreamSyncMode, runCount: number): StravaStreamSyncResult {
+  return {
+    activities: [],
+    attemptedCount: 0,
+    fetchedCount: 0,
+    failedCount: 0,
+    unavailableCount: 0,
+    skippedCount: runCount,
+    rateLimited: false,
+    remainingCount: runCount,
+    mode
+  };
+}
+
+function easyPaceBaseline(activities: Activity[]) {
+  return medianDefined(
+    activities
+      .filter(isRun)
+      .filter((activity) => !isLikelyStreamCandidate(activity))
+      .map((activity) => activity.averagePaceSecondsPerKm)
+  ) ?? medianDefined(activities.filter(isRun).map((activity) => activity.averagePaceSecondsPerKm));
+}
+
+function numericStream(stream?: StravaStream) {
+  return (stream?.data ?? []).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+}
+
+function booleanStream(stream?: StravaStream) {
+  return (stream?.data ?? []).filter((value): value is boolean => typeof value === "boolean");
+}
+
+function isRun(activity: Activity) {
+  return activity.sportType.toLowerCase().includes("run");
+}
+
+function byNewestStartDate(left: Activity, right: Activity) {
+  return new Date(right.startDate).getTime() - new Date(left.startDate).getTime();
+}
+
+function medianDefined(values: Array<number | undefined>) {
+  const sorted = values.filter((value): value is number => value !== undefined && Number.isFinite(value)).sort((left, right) => left - right);
+  if (!sorted.length) return undefined;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
 function normalizeUrl(value: string) {

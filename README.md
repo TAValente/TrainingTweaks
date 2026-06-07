@@ -1,8 +1,8 @@
 # TrainingTweaks
 
-TrainingTweaks is a chat-first running decision assistant that helps a self-coached runner adapt an existing training plan when real life disrupts it.
+TrainingTweaks is a chat-first running decision assistant that helps a self-coached runner adapt a plan when real life disrupts it.
 
-It does not generate a full training plan. It helps answer: given recent training, goals, constraints, and how the runner feels today, what are the reasonable options and tradeoffs?
+It is not primarily a training plan generator, but it can generate a simple baseline plan so the app has a planned future to tweak. It helps answer: given recent training, goals, constraints, the plan, and how the runner feels today, what are the reasonable options and tradeoffs?
 
 ## Product Doctrine
 
@@ -33,7 +33,7 @@ Key engineering rule: deterministic systems should calculate facts and risk sign
 - Require configured user login before exposing the app or API routes.
 - Ask a running adaptation question in chat.
 - Receive a direct recommendation grounded in doctrine, context, recent training, and the user's current constraints.
-- Compute deterministic running risk findings from recent activity history.
+- Compute deterministic load/risk findings from capacity, adaptation, cardio load, mechanical exposure, novelty, and decision risk.
 - Persist recent model runs for later prompt review and evaluation.
 - Save lightweight answer feedback for retained model runs.
 
@@ -113,17 +113,26 @@ Chat requests append model run records to the same app state, whether backed by 
 
 Recent retained runs can be inspected with `GET /api/model-runs`; pass `?limit=10` to change the default response size. Use `GET /api/model-runs?export=json` to download all retained model runs as JSON for prompt review or eval set development. Use `PATCH /api/model-runs` with a model run id, `positive` or `negative` rating, and optional note to save feedback. Feedback writes are verified by reading the retained run back after persistence.
 
-## Deterministic Risk Findings
+## Deterministic Load/Risk Framework
 
-TrainingTweaks computes V1 running risk findings with a parameterized rules engine in `src/lib/risk.ts`. The engine emits individual explainable findings, not a single injury prediction score, and preserves runner agency by using neutral messages such as "Longest run was 42% of weekly mileage."
+TrainingTweaks computes V1 load/risk findings with a parameterized framework in `src/lib/risk.ts`. The original risk layer was scaffolding; the source of truth is now:
 
-Findings are included in `/api/state`, Strava refresh responses, the main UI sidebar, and the structured running context sent to the model. Thresholds, windows, confidence labels, severities, and enabled flags live in the default risk config so they can be tuned later or adapted per runner.
+- capacity: historical ability and running background
+- adaptation: current preparedness from recent observed training
+- cardio load: internal strain, using Strava relative effort when available
+- mechanical exposure: distance, duration, long runs, fast running, elevation, and stream-derived signals when available
+- novelty: unusual exposure versus current adaptation
+- decision risk: decision-facing findings for the recommendation engine
+
+The data flow is raw Strava activity data -> normalized activity facts -> derived exposure metrics -> capacity/adaptation/novelty/risk framework -> recommendation. Findings are included in `/api/state`, Strava refresh responses, the main UI sidebar, and the structured running context sent to the model.
+
+For the current single-user product, Strava refresh also syncs activity streams broadly for running activities where feasible. Stream sync is resumable across refreshes because each activity stores stream metadata for fetched, failed, unavailable, rate-limited, or not-attempted states. Use `STRAVA_STREAM_SYNC_MODE=full` for the current default, `selective` for future candidate-only enrichment, or `off` to disable stream sync. `STRAVA_STREAM_SYNC_LIMIT` caps stream requests per refresh.
 
 ## Structured Training Plans
 
 Structured plan data is stored inside the existing per-user app state JSON. The current schema represents runner-provided imported plans as weeks, days, workout types, mileage or duration targets, intensity, and purpose. Named plan families are treated as metadata and adaptation guidance unless the user supplies their own plan details.
 
-TrainingTweaks also includes a deterministic generic marathon scaffold generated from current miles per week, target or max miles per week, plan length, and low/regular/high risk tolerance. Risk tolerance is parameterized as a planned-risk budget: low allows no scheduled yellow or red findings, regular allows limited yellow findings and no red findings, and high allows more yellow findings with a small red allowance. The starter marathon generator only schedules recovery runs, workout placeholders, and long runs for now; workout details are intentionally left to be chosen later.
+TrainingTweaks also includes a deterministic generic marathon scaffold generated from current miles per week, target or max miles per week, plan length, and low/regular/high risk tolerance. This is a baseline plan source feeding planned-vs-observed decision risk, not a separate coaching philosophy. Risk tolerance is parameterized as a planned-risk budget: low allows no scheduled yellow or red findings, regular allows limited yellow findings and no red findings, and high allows more yellow findings with a small red allowance. The starter marathon generator only schedules recovery runs, workout placeholders, and long runs for now; workout details are intentionally left to be chosen later.
 
 The Plan tab lets a runner generate a starter plan, anchor it to a real calendar start date, and review each week with expected load, intensity, durability, and day-by-day workouts.
 
@@ -142,6 +151,8 @@ POSTGRES_PASSWORD=
 ```
 
 `STRAVA_DETAIL_SYNC_LIMIT` controls how many run activities are enriched with detailed Strava best-effort data per refresh. The default is `30`, which keeps Vercel requests from trying to fetch years of detailed runs in one shot.
+
+`STRAVA_STREAM_SYNC_MODE` controls stream enrichment. The current default is `full` because TrainingTweaks is a single-user product and fast-running exposure is a core signal. `STRAVA_STREAM_SYNC_LIMIT` controls how many run stream requests are attempted per refresh; repeat refreshes continue from activities that have not yet fetched streams.
 
 ## Vercel Auth and Preview
 

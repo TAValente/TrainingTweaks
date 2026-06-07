@@ -1,4 +1,4 @@
-import type { StructuredTrainingPlan, TrainingPlanDayOfWeek } from "./types";
+import type { PlannedWorkoutExposure, StructuredTrainingPlan, TrainingPlanDayOfWeek } from "./types";
 
 export function structuredPlanSnapshot(plan?: StructuredTrainingPlan) {
   if (!plan) return undefined;
@@ -48,6 +48,22 @@ export function structuredPlanSummary(plan?: StructuredTrainingPlan) {
   return `${snapshot.name}: week ${snapshot.currentWeek}/${snapshot.durationWeeks}, ${snapshot.currentDay}, today ${plannedToday}.`;
 }
 
+export function plannedWorkoutExposureFromSnapshot(
+  snapshot?: ReturnType<typeof structuredPlanSnapshot>
+): PlannedWorkoutExposure | undefined {
+  const workout = snapshot?.plannedToday;
+  if (!workout) return undefined;
+  return {
+    source: plannedExposureSource(snapshot?.source),
+    type: workout.type,
+    targetMiles: workout.targetMiles,
+    durationMinutes: workout.durationMinutes,
+    intensity: workout.intensity,
+    purpose: workout.purpose,
+    confidence: workout.type === "rest" ? "high" : "medium"
+  };
+}
+
 function upcomingDays(
   plan: StructuredTrainingPlan,
   currentWeek: number,
@@ -89,4 +105,11 @@ function parseIsoDate(value: string) {
 
 function dayOfWeekFromIndex(index: number): TrainingPlanDayOfWeek {
   return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"][index] as TrainingPlanDayOfWeek;
+}
+
+function plannedExposureSource(source: StructuredTrainingPlan["source"] | undefined): PlannedWorkoutExposure["source"] {
+  if (source === "trainingtweaks_generic") return "trainingtweaks_generated_plan";
+  if (source === "user_import") return "imported_plan";
+  if (source === "manual") return "manual_plan";
+  return "unknown";
 }

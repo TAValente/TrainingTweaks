@@ -1,6 +1,6 @@
 import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
-import { computeRiskFindings } from "./risk";
-import { structuredPlanSnapshot } from "./structured-plans";
+import { buildLoadRiskContext, computeRiskFindings } from "./risk";
+import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "./structured-plans";
 
 const metersPerMile = 1609.344;
 const defaultTimeZone = "America/New_York";
@@ -71,7 +71,10 @@ export function contextForPrompt(
   const now = new Date();
   const timeZone = defaultTimeZone;
   const summary = buildActivitySummary(activities, now);
-  const riskFindings = computeRiskFindings({ activities, asOfDate: now });
+  const structuredTrainingPlan = structuredPlanSnapshot(context.structuredPlan);
+  const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredTrainingPlan);
+  const loadRiskContext = buildLoadRiskContext(activities, now, undefined, plannedWorkout);
+  const riskFindings = computeRiskFindings({ activities, asOfDate: now, plannedWorkout });
   const today = localDateParts(now, timeZone);
   const recentRuns = activities
     .filter(isRun)
@@ -120,12 +123,13 @@ export function contextForPrompt(
       note: "Use todayLocalDate, todayDayOfWeek, and daysAgo values for schedule reasoning."
     },
     summary,
+    loadRiskContext,
     riskFindings,
     selectedTrainingPlan: {
       source: context.planSource || "unknown",
       variant: context.planVariant || "Not provided"
     },
-    structuredTrainingPlan: structuredPlanSnapshot(context.structuredPlan),
+    structuredTrainingPlan,
     planContext: context.planContext || "Not provided",
     goalsContext: context.goalsContext || "Not provided",
     subjectiveContext: context.subjectiveContext || "Not provided",

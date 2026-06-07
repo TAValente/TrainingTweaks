@@ -21,13 +21,10 @@ Inputs:
 
 Outputs:
 
-- weekly mileage
-- monthly mileage
-- pace trends
-- consistency metrics
-- PR history
-- long run progression
-- workout counts
+- normalized activity facts
+- rolling mileage, duration, long-run, elevation, HR, effort, and pace facts
+- raw Strava stream data and stream summaries for running activities where feasible
+- PR and best-effort history when available
 
 No LLM involvement.
 
@@ -35,26 +32,20 @@ No LLM involvement.
 
 Responsible for deterministic risk detection.
 
-Examples:
+The original risk layer was scaffolding. The source of truth is the load/risk framework:
 
-- overtraining indicators
-- undertraining indicators
-- workload spikes
-- long run progression risk
-- workout density risk
-- insufficient recovery
+- capacity context
+- adaptation context
+- cardio load
+- mechanical exposure
+- novelty signals
+- decision risk findings
 
-Outputs structured risk signals.
+Decision risk is the output exposed to the judgment layer. It should reconcile recent reality, planned work, and structured subjective flags when available.
 
-Example:
+The risk layer should prefer clean observable signals over old static proxy metrics. If an old rule maps cleanly to the framework, reuse its implementation. If it only kind of maps, replace it.
 
-```json
-{
-  "overtrainingRisk": "moderate",
-  "rampRate": "elevated",
-  "recovery": "normal"
-}
-```
+For the current single-user product, stream sync should optimize for signal quality. Fetch and store streams broadly for authenticated running history, with resumable/idempotent metadata for fetched, failed, unavailable, rate-limited, and not-attempted states. Keep selective enrichment as a future mode for multi-user scaling or rate-limit pressure.
 
 No LLM involvement.
 
@@ -89,6 +80,9 @@ User
 -> Strava OAuth
 -> Activity Import
 -> Activity Normalization
+-> Stream Sync
+-> Derived Exposure Metrics
+-> Capacity / Adaptation / Novelty Framework
 -> Fact Layer
 -> Risk Layer
 -> Context Builder
@@ -144,14 +138,14 @@ Examples:
 
 Existing training plan.
 
-Initially:
+Valid sources:
 
-- pasted text
-- uploaded documents
+- TrainingTweaks-generated baseline plan
+- imported plan
+- manually entered plan
+- future integrations
 
-Future:
-
-- structured plan parsing
+All plan sources should compile into the same canonical planned-workout representation. A generated plan is a starting hypothesis that gives the decision engine a planned future to tweak, not a sacred training philosophy.
 
 ### Decision
 

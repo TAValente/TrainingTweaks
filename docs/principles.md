@@ -12,11 +12,13 @@ Activities are inputs. Plans are inputs. Goals are inputs. The product exists to
 
 When evaluating a feature, ask: does this help the runner make a better decision? If not, reconsider building it.
 
-## 2. Adapt Plans, Do Not Create Them
+## 2. Adapt Plans First
 
-TrainingTweaks interprets and adapts an existing training philosophy. It does not invent one.
+TrainingTweaks is a plan adaptation and decision product. It may generate a simple baseline plan when the runner does not bring one, because the app needs a planned future to intelligently tweak.
 
-The system should act like an assistant coach who understands the runner's plan, not a head coach creating one from scratch.
+A generated plan is a starting hypothesis, not sacred truth. The system should support bring-your-own-plan without requiring it, and all plan sources should compile into the same canonical planned-workout representation.
+
+Plan generation should remain simple, parameterized, and explainable. Do not expand into elaborate branded training philosophies before the adaptation layer is strong.
 
 ## 3. Minimize User Effort
 
@@ -39,6 +41,17 @@ If a fact can be calculated, calculate it.
 Do not ask an LLM to compute mileage, training load, ramp rates, workout counts, consistency metrics, or risk scores.
 
 Use deterministic systems for facts. Use AI for judgment.
+
+The deterministic load/risk framework is:
+
+- capacity
+- adaptation
+- cardio load
+- mechanical exposure
+- novelty
+- decision risk
+
+Use raw activity inputs and derived exposure metrics for this framework. Do not preserve old derived metrics merely because they exist.
 
 ## 5. Judgment Is the Product
 
