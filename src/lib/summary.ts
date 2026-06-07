@@ -1,9 +1,9 @@
 import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
-import { computeRiskFindings } from "./risk";
-import { structuredPlanSnapshot } from "./structured-plans";
+import { defaultTimeZone, localDateParts } from "./calendar";
+import { buildLoadRiskContext, computeRiskFindings } from "./risk";
+import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "./structured-plans";
 
 const metersPerMile = 1609.344;
-const defaultTimeZone = "America/New_York";
 
 export function isRun(activity: Activity) {
   const sport = activity.sportType.toLowerCase();
@@ -70,9 +70,12 @@ export function contextForPrompt(
 ) {
   const now = new Date();
   const timeZone = defaultTimeZone;
-  const summary = buildActivitySummary(activities, now);
-  const riskFindings = computeRiskFindings({ activities, asOfDate: now });
   const today = localDateParts(now, timeZone);
+  const summary = buildActivitySummary(activities, now);
+  const structuredTrainingPlan = structuredPlanSnapshot(context.structuredPlan, { localDate: today.date });
+  const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredTrainingPlan);
+  const loadRiskContext = buildLoadRiskContext(activities, now, undefined, plannedWorkout);
+  const riskFindings = computeRiskFindings({ activities, asOfDate: now, plannedWorkout });
   const recentRuns = activities
     .filter(isRun)
     .sort(byNewestStartDate)
@@ -120,12 +123,13 @@ export function contextForPrompt(
       note: "Use todayLocalDate, todayDayOfWeek, and daysAgo values for schedule reasoning."
     },
     summary,
+    loadRiskContext,
     riskFindings,
     selectedTrainingPlan: {
       source: context.planSource || "unknown",
       variant: context.planVariant || "Not provided"
     },
-    structuredTrainingPlan: structuredPlanSnapshot(context.structuredPlan),
+    structuredTrainingPlan,
     planContext: context.planContext || "Not provided",
     goalsContext: context.goalsContext || "Not provided",
     subjectiveContext: context.subjectiveContext || "Not provided",
@@ -292,21 +296,6 @@ function daysBetween(then: Date, now: Date) {
 
 function byNewestStartDate(a: Activity, b: Activity) {
   return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-}
-
-function localDateParts(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone,
-    weekday: "long",
-    year: "numeric"
-  }).formatToParts(date);
-  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return {
-    date: `${value("year")}-${value("month")}-${value("day")}`,
-    dayOfWeek: value("weekday")
-  };
 }
 
 function daysBetweenLocalDates(then: string, now: string) {

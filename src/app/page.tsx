@@ -69,30 +69,31 @@ const calendarLegendItems: { kind: CalendarWorkoutKind; label: string }[] = [
 
 const dashboardGroups = [
   {
-    id: "load",
-    label: "Load",
+    id: "context",
+    label: "Context",
     rules: [
-      { ruleId: "weekly_volume_growth", label: "Weekly volume" },
-      { ruleId: "acwr_mileage", label: "7d/28d load" },
-      { ruleId: "consecutive_build_weeks", label: "Build weeks" }
+      { ruleId: "capacity_context", label: "Capacity" },
+      { ruleId: "adaptation_context", label: "Adaptation" },
+      { ruleId: "decision_risk_observed", label: "Decision risk" }
     ]
   },
   {
-    id: "intensity",
-    label: "Intensity",
+    id: "exposure",
+    label: "Exposure",
     rules: [
-      { ruleId: "hard_session_count", label: "Hard sessions" },
-      { ruleId: "intensity_spike", label: "Intensity load" },
-      { ruleId: "hard_day_clustering", label: "Hard-day spacing" }
+      { ruleId: "cardio_load_7d", label: "Cardio load" },
+      { ruleId: "mechanical_exposure_7d", label: "Mechanical" },
+      { ruleId: "fast_running_novelty", label: "Fast running" }
     ]
   },
   {
-    id: "durability",
-    label: "Durability",
+    id: "novelty",
+    label: "Novelty",
     rules: [
-      { ruleId: "long_run_percentage", label: "Long-run share" },
-      { ruleId: "long_run_jump", label: "Long-run jump" },
-      { ruleId: "consecutive_running_days", label: "Run streak" }
+      { ruleId: "mileage_novelty", label: "Mileage" },
+      { ruleId: "long_run_novelty", label: "Long run" },
+      { ruleId: "cardio_load_novelty", label: "Cardio" },
+      { ruleId: "elevation_novelty", label: "Elevation" }
     ]
   }
 ];
@@ -1075,9 +1076,9 @@ function plannedWeekMetrics(plan: StructuredTrainingPlan, week: TrainingPlanWeek
   const workoutMiles = round1(workouts.reduce((total, day) => total + (day.workout.targetMiles ?? 0), 0));
   const longRunMiles = week.days.find((day) => day.workout.type === "long_run")?.workout.targetMiles ?? 0;
   const longRunShare = targetMiles ? round1((longRunMiles / targetMiles) * 100) : 0;
-  const load = assessment("weekly_volume_growth");
-  const intensity = assessment("hard_session_count");
-  const durability = assessment("long_run_percentage");
+  const load = assessment("planned_mileage_step");
+  const intensity = assessment("planned_quality_density");
+  const durability = assessment("planned_long_run_share");
 
   return [
     {
@@ -1367,37 +1368,30 @@ function groupStatus(
 ): TrainingStatus {
   if (metrics.some((metric) => metric.severity === "red")) return "high-risk";
   if (metrics.some((metric) => metric.severity === "yellow")) return "risky";
-  if (groupId === "load" && isLoadDetraining(metrics)) return "de-training";
-  if (groupId === "intensity" && (metrics[0]?.finding?.observedValue ?? 1) === 0) return "de-training";
-  if (groupId === "durability" && (metrics[0]?.finding?.observedValue ?? 1) === 0) return "de-training";
+  if (groupId === "context" && metrics.some((metric) => metric.ruleId === "adaptation_context" && metric.finding?.framework?.adaptation?.classification === "low")) return "de-training";
+  if (groupId === "exposure" && (metrics[1]?.finding?.observedValue ?? 1) === 0) return "de-training";
   return "productive";
-}
-
-function isLoadDetraining(metrics: Array<{ ruleId: string; finding?: RiskFinding }>) {
-  const weeklyGrowth = metrics.find((metric) => metric.ruleId === "weekly_volume_growth")?.finding?.observedValue;
-  const acwr = metrics.find((metric) => metric.ruleId === "acwr_mileage")?.finding?.observedValue;
-  return (weeklyGrowth !== undefined && weeklyGrowth <= -0.2) || (acwr !== undefined && acwr < 0.75);
 }
 
 function groupSummary(groupId: string, status: TrainingStatus) {
   if (status === "high-risk") {
-    if (groupId === "load") return "Load is outside current guardrails.";
-    if (groupId === "intensity") return "Quality work is clustered too tightly.";
-    return "Durability guardrails are under pressure.";
+    if (groupId === "context") return "Observed risk should dominate today's decision.";
+    if (groupId === "exposure") return "Recent exposure is unusually demanding.";
+    return "Novelty is high relative to current adaptation.";
   }
   if (status === "risky") {
-    if (groupId === "load") return "Load is productive but needs attention.";
-    if (groupId === "intensity") return "Quality is useful, but spacing is tight.";
-    return "Durability is usable with one watch item.";
+    if (groupId === "context") return "Capacity and adaptation need careful interpretation.";
+    if (groupId === "exposure") return "Recent exposure has one watch item.";
+    return "Some exposure is unusual versus the adaptation baseline.";
   }
   if (status === "de-training") {
-    if (groupId === "load") return "Recent load is below the training baseline.";
-    if (groupId === "intensity") return "Quality stimulus is currently low.";
-    return "Durability stimulus is currently light.";
+    if (groupId === "context") return "Current adaptation is below durable capacity.";
+    if (groupId === "exposure") return "Recent mechanical exposure is light.";
+    return "Novelty is low because recent exposure is light.";
   }
-  if (groupId === "load") return "Volume is building without a spike.";
-  if (groupId === "intensity") return "Quality work is within current guardrails.";
-  return "Long run and streak support the build.";
+  if (groupId === "context") return "Capacity, adaptation, and observed risk are aligned.";
+  if (groupId === "exposure") return "Cardio and mechanical exposure are readable.";
+  return "Recent exposure is close to current adaptation.";
 }
 
 function statusLabel(status: TrainingStatus) {
@@ -1415,54 +1409,46 @@ function metricSeverity(finding: RiskFinding | undefined): "green" | "yellow" | 
 function metricValue(ruleId: string, finding: RiskFinding | undefined, summary: ActivitySummary) {
   if (finding) {
     const observed = finding.observedValue;
-    if (ruleId === "weekly_volume_growth") return observed === undefined ? "n/a" : signedPercent(observed);
-    if (ruleId === "acwr_mileage") return observed === undefined ? "n/a" : `${round2(observed)}x`;
-    if (ruleId === "consecutive_build_weeks") return `${observed ?? "n/a"}`;
-    if (ruleId === "long_run_percentage") return observed === undefined ? "n/a" : `${Math.round(observed * 100)}%`;
-    if (ruleId === "long_run_jump") return observed === undefined ? "n/a" : signedPercent(observed);
-    if (ruleId === "hard_session_count") return `${observed ?? "n/a"} / 7d`;
-    if (ruleId === "intensity_spike") return observed === undefined ? "n/a" : signedPercent(observed);
-    if (ruleId === "hard_day_clustering") return observed === undefined ? "checked" : `${observed} hard`;
-    if (ruleId === "consecutive_running_days") return `${observed ?? "n/a"} days`;
+    if (ruleId === "capacity_context") return finding.framework?.capacity?.classification ?? "unknown";
+    if (ruleId === "adaptation_context") return finding.framework?.adaptation?.classification ?? "unknown";
+    if (ruleId === "decision_risk_observed") return observed === undefined ? "clear" : `${observed} driver${observed === 1 ? "" : "s"}`;
+    if (ruleId === "cardio_load_7d") return observed === undefined ? "n/a" : `${round2(observed)}`;
+    if (ruleId === "mechanical_exposure_7d") return observed === undefined ? "n/a" : `${round2(observed)} mi`;
+    if (ruleId.endsWith("_novelty")) return noveltyValue(finding);
+    return observed === undefined ? "n/a" : `${round2(observed)} ${finding.unit ?? ""}`.trim();
   }
 
-  if (ruleId === "weekly_volume_growth") return `${summary.mileageLast7Days} mi / 7d`;
-  if (ruleId === "acwr_mileage") return `${summary.mileageLast28Days} mi / 28d`;
-  if (ruleId === "long_run_percentage") return `${summary.longestRunLast14DaysMiles} mi`;
-  if (ruleId === "hard_session_count" || ruleId === "intensity_spike") {
-    return `${summary.recentIntensityIndicators.length}`;
-  }
+  if (ruleId === "mechanical_exposure_7d") return `${summary.mileageLast7Days} mi / 7d`;
 
   return "n/a";
 }
 
 function metricDetail(ruleId: string, finding: RiskFinding | undefined, summary: ActivitySummary) {
   if (finding) {
-    if (ruleId === "weekly_volume_growth") return "vs prior week";
-    if (ruleId === "acwr_mileage") return "7d vs 28d baseline";
-    if (ruleId === "consecutive_build_weeks") return "consecutive increases";
-    if (ruleId === "long_run_percentage") return `${summary.longestRunLast14DaysMiles} mi of ${summary.mileageLast7Days} mi`;
-    if (ruleId === "long_run_jump") return "vs prior 4-week avg";
-    if (ruleId === "hard_session_count") return "inferred hard runs";
-    if (ruleId === "intensity_spike") return `${finding.evidence.proxy ?? "load"} proxy`;
-    if (ruleId === "hard_day_clustering") return finding.severity === "green" ? "no cluster detected" : "cluster pattern";
-    if (ruleId === "consecutive_running_days") return "current streak";
+    if (ruleId === "capacity_context") return `${finding.framework?.capacity?.historicalPeakWeeklyMileage ?? "n/a"} peak mpw`;
+    if (ruleId === "adaptation_context") return `${finding.framework?.adaptation?.mileagePerWeek28Days ?? "n/a"} current mpw`;
+    if (ruleId === "cardio_load_7d") return finding.framework?.cardioLoad?.cardioLoadSource ?? "unknown source";
+    if (ruleId === "mechanical_exposure_7d") return `${finding.framework?.mechanicalExposure?.longestRunMiles ?? summary.longestRunLast14DaysMiles} mi long`;
+    if (ruleId.endsWith("_novelty")) return noveltyDetail(finding);
+    if (ruleId === "decision_risk_observed") return "observed, not planned";
+    return finding.confidence;
   }
 
-  if (ruleId === "weekly_volume_growth") return "waiting on prior week";
-  if (ruleId === "acwr_mileage") return "waiting on baseline";
-  if (ruleId === "consecutive_build_weeks") return "waiting on week history";
-  if (ruleId === "long_run_percentage") return "waiting on weekly mileage";
-  if (ruleId === "long_run_jump") return "waiting on long-run baseline";
-  if (ruleId === "hard_session_count") return "waiting on classification";
-  if (ruleId === "intensity_spike") return "waiting on effort baseline";
-  if (ruleId === "hard_day_clustering") return "waiting on hard sessions";
-  return "waiting on run streak";
+  return "waiting on data";
 }
 
-function signedPercent(value: number) {
-  const rounded = Math.round(value * 100);
-  return `${rounded > 0 ? "+" : ""}${rounded}%`;
+function noveltyValue(finding: RiskFinding) {
+  const signal = finding.evidence.noveltySignal as { currentValue?: number; unit?: string } | undefined;
+  if (!signal || signal.currentValue === undefined) return "n/a";
+  if (signal.unit === "seconds") return `${Math.round(signal.currentValue / 60)} min`;
+  return `${round2(signal.currentValue)} ${signal.unit ?? ""}`.trim();
+}
+
+function noveltyDetail(finding: RiskFinding) {
+  const signal = finding.evidence.noveltySignal as { baselineValue?: number; unit?: string; source?: string } | undefined;
+  if (!signal) return finding.confidence;
+  const baseline = signal.baselineValue === undefined ? "n/a" : signal.unit === "seconds" ? `${Math.round(signal.baselineValue / 60)} min` : `${round2(signal.baselineValue)} ${signal.unit ?? ""}`.trim();
+  return `baseline ${baseline}, ${signal.source ?? finding.confidence}`;
 }
 
 function round2(value: number) {

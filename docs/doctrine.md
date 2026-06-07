@@ -4,7 +4,7 @@
 
 TrainingTweaks exists to help runners make better training decisions with less effort.
 
-The product is not a coach, a training plan generator, or an activity tracker.
+The product is not a coach or an activity tracker.
 
 The product exists to answer:
 
@@ -22,7 +22,7 @@ The primary object in the system is **Decision**, not Activity, Workout, or Plan
 
 ## Product Boundary
 
-TrainingTweaks interprets and adapts an existing training philosophy. TrainingTweaks does not create a training philosophy.
+TrainingTweaks interprets and adapts a training plan or training intent. TrainingTweaks may generate a simple baseline plan when the runner does not bring one, but plan generation exists to create something useful to tweak.
 
 In scope:
 
@@ -36,13 +36,14 @@ In scope:
 
 Out of scope:
 
-- Build me a marathon plan.
 - Design a 16-week training cycle.
 - Create a coaching philosophy.
 - Replace a human coach.
 - Resolve obvious non-training boundary conditions such as dangerous weather, medical emergencies, or clear safety issues.
 
-When recommending a workout, TrainingTweaks should anchor recommendations to the user's existing plan, stated goal, and established training pattern. It should not invent training structure from scratch.
+When recommending a workout, TrainingTweaks should anchor recommendations to the user's plan, stated goal, and established training pattern. Valid plan sources include a TrainingTweaks-generated baseline plan, an imported plan, a manually entered plan, and future integrations. All plan sources should compile into the same canonical planned-workout representation.
+
+A generated plan is a starting hypothesis, not sacred truth. TrainingTweaks is a plan adaptation and decision product, not primarily a training plan generator. Plan generation should remain simple, parameterized, explainable, and subordinate to the adaptation layer. Do not expand into elaborate branded training philosophies before planned-vs-observed decision risk is strong.
 
 TrainingTweaks should not over-design edge cases where the answer is outside normal training judgment. If the user's situation is clearly unsafe or medical, the product should say so plainly and avoid turning it into a nuanced workout optimization problem.
 
@@ -88,14 +89,14 @@ Business logic should be deterministic whenever practical.
 
 Use SQL, code, and calculations for:
 
-- mileage summaries
-- training load
-- consistency metrics
-- workout density
-- ramp rates
-- overtraining signals
-- undertraining signals
-- historical statistics
+- normalized activity facts
+- capacity context
+- adaptation context
+- cardio load
+- mechanical exposure
+- novelty signals
+- decision risk findings
+- historical statistics that explain decisions
 
 Use AI for:
 
@@ -106,6 +107,33 @@ Use AI for:
 - recommendation generation
 
 The LLM should reason from facts. It should not calculate facts.
+
+## Load And Risk Doctrine
+
+The original risk layer was scaffolding. The source of truth is now:
+
+- capacity: historical ability and running background
+- adaptation: current preparedness from recent observed training
+- cardio load: internal strain, with source and confidence
+- mechanical exposure: musculoskeletal exposure from distance, duration, long runs, fast running, elevation, and streams when available
+- novelty: how unusual current exposure is versus current adaptation
+- decision risk: the decision-facing synthesis of adaptation, novelty, exposure, planned work, and pain/fatigue/injury signals when available
+
+Capacity is not adaptation. A runner may have high historical capacity and low current adaptation. Detraining should emerge from adaptation context rather than a separate v1 decay model.
+
+The data flow should be:
+
+```text
+Raw Strava activity data
+-> normalized activity facts
+-> derived exposure metrics
+-> capacity/adaptation/novelty/risk framework
+-> decision recommendation
+```
+
+Reuse raw data, not old interpretations. Old vague metrics are not parallel doctrine. Delete, rename, or demote old derived metrics when they do not cleanly support the framework. Metrics exist to support recommendations, not analytics dashboards.
+
+For now, fetch and store Strava streams broadly for the authenticated user's running history where feasible. This is a single-user product, and fast-running exposure plus mechanical novelty are core signals. Store sync metadata so the system can distinguish fetched, failed, unavailable, rate-limited, and not-attempted streams. Keep no-stream fallback behavior for future non-stream users, but do not fake precise fast-running exposure when streams are absent.
 
 ## Runner Memory
 

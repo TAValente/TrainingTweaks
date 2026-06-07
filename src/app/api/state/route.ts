@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { activitiesForClient } from "@/lib/activity-serialization";
 import { authCookieName, getRequestUser } from "@/lib/auth";
+import { defaultTimeZone, localDateParts } from "@/lib/calendar";
 import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
 import { computeRiskFindings } from "@/lib/risk";
+import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "@/lib/structured-plans";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -13,14 +16,18 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Login required." }, { status: 401 });
 
     const data = await getData(user.id);
+    const today = localDateParts(new Date(), defaultTimeZone);
+    const plannedWorkout = plannedWorkoutExposureFromSnapshot(
+      structuredPlanSnapshot(data.context?.structuredPlan, { localDate: today.date })
+    );
     return NextResponse.json({
       user,
       connected: Boolean(data.strava),
       lastRefreshAt: data.lastRefreshAt,
-      activities: data.activities.slice(0, 20),
+      activities: activitiesForClient(data.activities.slice(0, 20)),
       context: data.context,
       summary: buildActivitySummary(data.activities),
-      riskFindings: computeRiskFindings({ activities: data.activities })
+      riskFindings: computeRiskFindings({ activities: data.activities, plannedWorkout })
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load app state.";

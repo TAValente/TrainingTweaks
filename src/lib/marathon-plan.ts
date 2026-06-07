@@ -39,37 +39,37 @@ type RiskToleranceConfig = {
 };
 
 const plannedRiskRules = {
-  weeklyVolumeGrowth: {
-    ruleId: "weekly_volume_growth",
-    label: "Weekly mileage growth",
+  plannedMileageStep: {
+    ruleId: "planned_mileage_step",
+    label: "Planned mileage step",
     yellowAt: 0.1,
     redAt: 0.2,
     unit: "growth_ratio"
   },
-  longRunPercentage: {
-    ruleId: "long_run_percentage",
-    label: "Long run share",
+  plannedLongRunShare: {
+    ruleId: "planned_long_run_share",
+    label: "Planned long-run share",
     yellowAt: 0.3,
     redAt: 0.4,
     unit: "share"
   },
-  longRunJump: {
-    ruleId: "long_run_jump",
-    label: "Long run increase",
+  plannedLongRunStep: {
+    ruleId: "planned_long_run_step",
+    label: "Planned long-run step",
     yellowAt: 0.2,
     redAt: 0.35,
     unit: "growth_ratio"
   },
-  hardSessionCount: {
-    ruleId: "hard_session_count",
-    label: "Workout count",
+  plannedQualityDensity: {
+    ruleId: "planned_quality_density",
+    label: "Planned quality density",
     yellowAt: 2,
     redAt: 3,
     unit: "sessions"
   },
-  consecutiveBuildWeeks: {
-    ruleId: "consecutive_build_weeks",
-    label: "Consecutive build weeks",
+  plannedBuildStreak: {
+    ruleId: "planned_build_streak",
+    label: "Planned build streak",
     yellowAt: 4,
     redAt: 6,
     unit: "weeks"
@@ -352,25 +352,25 @@ function assessPlannedRisk(weeks: TrainingPlanWeek[], currentMilesPerWeek: numbe
   const assessments: TrainingPlanRiskAssessment[] = [];
   let previousMileage = currentMilesPerWeek;
   let previousLongRun = Math.max(4, currentMilesPerWeek * 0.28);
-  let consecutiveBuildWeeks = 0;
+  let plannedBuildStreak = 0;
 
   for (const week of weeks) {
     const targetMiles = week.targetMiles ?? 0;
     const longRunMiles = longestRunMiles(week);
-    const hardSessionCount = week.days.filter((day) => day.workout.type === "workout").length;
+    const plannedQualityCount = week.days.filter((day) => day.workout.type === "workout").length;
     const isRaceWeek = week.focus === "Race week";
     const growth = previousMileage > 0 ? targetMiles / previousMileage - 1 : 0;
     const longRunShare = targetMiles > 0 ? longRunMiles / targetMiles : 0;
-    const longRunJump = previousLongRun > 0 ? longRunMiles / previousLongRun - 1 : 0;
+    const plannedLongRunStep = previousLongRun > 0 ? longRunMiles / previousLongRun - 1 : 0;
 
-    consecutiveBuildWeeks = targetMiles > previousMileage * 1.01 ? consecutiveBuildWeeks + 1 : 0;
+    plannedBuildStreak = targetMiles > previousMileage * 1.01 ? plannedBuildStreak + 1 : 0;
 
     assessments.push(
-      riskAssessment(week.weekNumber, plannedRiskRules.weeklyVolumeGrowth, growth, `${percent(growth)} weekly mileage growth`, isRaceWeek),
-      riskAssessment(week.weekNumber, plannedRiskRules.longRunPercentage, longRunShare, `${percent(longRunShare)} of week in long run`, isRaceWeek),
-      riskAssessment(week.weekNumber, plannedRiskRules.longRunJump, longRunJump, `${percent(longRunJump)} long-run change`, isRaceWeek),
-      riskAssessment(week.weekNumber, plannedRiskRules.hardSessionCount, hardSessionCount, `${hardSessionCount} workout placeholder`, isRaceWeek),
-      riskAssessment(week.weekNumber, plannedRiskRules.consecutiveBuildWeeks, consecutiveBuildWeeks, `${consecutiveBuildWeeks} consecutive build weeks`, isRaceWeek)
+      riskAssessment(week.weekNumber, plannedRiskRules.plannedMileageStep, growth, `${percent(growth)} planned mileage step`, isRaceWeek),
+      riskAssessment(week.weekNumber, plannedRiskRules.plannedLongRunShare, longRunShare, `${percent(longRunShare)} of week in long run`, isRaceWeek),
+      riskAssessment(week.weekNumber, plannedRiskRules.plannedLongRunStep, plannedLongRunStep, `${percent(plannedLongRunStep)} planned long-run step`, isRaceWeek),
+      riskAssessment(week.weekNumber, plannedRiskRules.plannedQualityDensity, plannedQualityCount, `${plannedQualityCount} workout placeholder`, isRaceWeek),
+      riskAssessment(week.weekNumber, plannedRiskRules.plannedBuildStreak, plannedBuildStreak, `${plannedBuildStreak} consecutive planned build weeks`, isRaceWeek)
     );
 
     previousMileage = targetMiles;

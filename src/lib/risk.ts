@@ -1,151 +1,53 @@
 import type {
   Activity,
-  RiskCategory,
+  AdaptationContext,
+  CapacityContext,
+  CardioLoad,
+  DecisionRiskContext,
+  MechanicalExposure,
+  NoveltySignal,
+  PlannedWorkoutExposure,
   RiskConfidence,
   RiskEngineConfig,
   RiskFinding,
   RiskRuleConfig,
-  RiskSeverity
+  RiskSeverity,
+  SignalSource
 } from "./types";
 
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const metersPerMile = 1609.344;
-const defaultLookbackDays = 7;
-const defaultBaselineDays = 28;
+
+// Rough v1 capacity heuristics only. Strava detailed best efforts are partial evidence
+// because they exist only for enriched activities, and they never override adaptation.
+const capacityBestEffortTargets = [
+  { distance: "1 mile" as const, meters: 1609.344, highSeconds: 6.5 * 60, moderateSeconds: 8.5 * 60 },
+  { distance: "5K" as const, meters: 5000, highSeconds: 22 * 60, moderateSeconds: 28 * 60 },
+  { distance: "10K" as const, meters: 10000, highSeconds: 45 * 60, moderateSeconds: 58 * 60 },
+  { distance: "Half marathon" as const, meters: 21097.5, highSeconds: 105 * 60, moderateSeconds: 130 * 60 },
+  { distance: "Marathon" as const, meters: 42195, highSeconds: 225 * 60, moderateSeconds: 285 * 60 }
+];
 
 export const defaultRiskConfig: RiskEngineConfig = {
-  version: "risk-v1",
+  version: "load-risk-framework-v1",
   rules: {
-    weeklyVolumeGrowth: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      minActivities: 2,
-      minMileage: 3,
-      thresholds: { green: 0.1, yellow: 0.1, red: 0.2 },
-      confidence: "medium"
-    },
-    acwrMileage: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      baselineDays: 28,
-      minActivities: 4,
-      minMileage: 5,
-      thresholds: { green: 1.2, yellow: 1.2, red: 1.5 },
-      confidence: "high"
-    },
-    consecutiveBuildWeeks: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      baselineDays: 56,
-      minActivities: 6,
-      thresholds: { green: 0, yellow: 4, red: 6 },
-      confidence: "medium"
-    },
-    longRunPercentage: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      minActivities: 2,
-      minMileage: 8,
-      thresholds: { green: 0, yellow: 0.3, red: 0.4 },
-      confidence: "high"
-    },
-    longRunJump: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      baselineDays: 28,
-      minActivities: 4,
-      minMileage: 8,
-      thresholds: { green: 0, yellow: 0.2, red: 0.35 },
-      confidence: "medium"
-    },
-    hardSessionCount: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      minActivities: 2,
-      thresholds: { green: 0, yellow: 2, red: 3 },
-      confidence: "high"
-    },
-    intensitySpike: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      baselineDays: 28,
-      minActivities: 4,
-      thresholds: { green: 0, yellow: 0.25, red: 0.5 },
-      confidence: "medium"
-    },
-    hardDayClustering: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 7,
-      severities: {
-        backToBackHard: "yellow",
-        hardNearLong: "yellow",
-        threeHardSessions: "red",
-        hardLongHard: "red"
-      },
-      thresholds: {
-        hardBackToBackDays: 1,
-        hardLongHours: 24,
-        threeHardSessionsDays: 5,
-        hardLongHardDays: 4
-      },
-      confidence: "high"
-    },
-    consecutiveRunningDays: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 14,
-      thresholds: { green: 0, yellow: 5, red: 7 },
-      confidence: "medium"
-    },
-    trainingNovelty: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 14,
-      baselineDays: 56,
-      minActivities: 6,
-      thresholds: {
-        green: 0,
-        yellow: 2,
-        red: 4,
-        componentYellowRatio: 1.2,
-        componentRedRatio: 1.5
-      },
-      confidence: "exploratory"
-    },
-    dataQuality: {
-      enabled: true,
-      includeGreen: true,
-      lookbackDays: 56,
-      minActivities: 8,
-      severities: {
-        limitedHistory: "info",
-        missingField: "info"
-      },
-      thresholds: { paceBaselineRuns: 5 },
-      confidence: "high"
-    }
+    capacityContext: frameworkRule(1825, 0, { yellow: 1, red: 2 }, "medium"),
+    adaptationContext: frameworkRule(42, 0, { yellow: 1, red: 2 }, "medium"),
+    cardioLoad: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
+    mechanicalExposure: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
+    novelty: frameworkRule(7, 42, { yellow: 1, red: 2 }, "exploratory"),
+    decisionRisk: frameworkRule(49, 0, { yellow: 1, red: 2 }, "medium"),
+    plannedVsObservedDecisionRisk: frameworkRule(49, 0, { yellow: 1, red: 2 }, "medium"),
+    dataQuality: frameworkRule(56, 0, { yellow: 8, red: 3 }, "high")
   },
   hardRunClassification: {
-    enabled: true,
-    includeGreen: false,
-    baselineDays: 56,
-    minActivities: 5,
-    thresholds: {
+    ...frameworkRule(7, 56, {
       paceFasterThanBaselinePct: 0.1,
-      heartRateAboveBaselinePct: 0.08,
       relativeEffortMultiplier: 1.35,
       relativeEffortHigh: 80,
-      perceivedEffortHigh: 7
-    },
-    confidence: "medium",
+      perceivedEffortHigh: 7,
+      streamFastSeconds: 180
+    }, "medium"),
     nameKeywords: ["workout", "race", "tempo", "threshold", "interval", "repetition", "speed", "fartlek"]
   }
 };
@@ -154,727 +56,765 @@ export type ComputeRiskFindingsInput = {
   activities: Activity[];
   asOfDate?: Date;
   config?: RiskEngineConfig;
+  plannedWorkout?: PlannedWorkoutExposure;
   runnerProfile?: Record<string, unknown>;
 };
 
-type RiskContext = {
+type FrameworkContext = {
   asOfDate: Date;
   config: RiskEngineConfig;
   runs: Activity[];
   hardRuns: HardRunClassification[];
+  capacity: CapacityContext;
+  adaptation: AdaptationContext;
+  cardioLoad7: CardioLoad;
+  cardioLoad28: CardioLoad;
+  mechanical3: MechanicalExposure;
+  mechanical7: MechanicalExposure;
+  mechanical28: MechanicalExposure;
+  noveltySignals: NoveltySignal[];
+  decisionRisk: DecisionRiskContext;
+  plannedWorkout?: PlannedWorkoutExposure;
 };
 
 type HardRunClassification = {
   activity: Activity;
   isHard: boolean;
   reasons: string[];
-  evidence: Record<string, unknown>;
+  confidence: RiskConfidence;
 };
 
-type WeekBucket = {
-  startDate: string;
-  endDate: string;
-  runs: Activity[];
-  mileage: number;
-  longestRunMiles: number;
-  hardSessionCount: number;
-  elevationGainMeters: number;
-};
-
-type HardLoadProxy = {
-  proxy: "relative_effort" | "heart_rate_time" | "pace_deviation_miles" | "hard_session_count";
-  value: number;
+type NoveltyConfig = {
+  floor: number;
+  mildAbsolute: number;
+  highAbsolute: number;
+  yellowRatio: number;
+  redRatio: number;
+  unit: string;
+  source: SignalSource;
   confidence: RiskConfidence;
 };
 
 export function computeRiskFindings({
   activities,
   asOfDate = new Date(),
-  config = defaultRiskConfig
+  config = defaultRiskConfig,
+  plannedWorkout
 }: ComputeRiskFindingsInput): RiskFinding[] {
-  const context = buildRiskContext(activities, asOfDate, config);
+  const context = buildFrameworkContext(activities, asOfDate, config, plannedWorkout);
   return [
     ...evaluateDataQuality(context),
-    ...evaluateWeeklyVolumeGrowth(context),
-    ...evaluateAcwr(context),
-    ...evaluateConsecutiveBuildWeeks(context),
-    ...evaluateLongRunPercentage(context),
-    ...evaluateLongRunJump(context),
-    ...evaluateHardSessionCount(context),
-    ...evaluateIntensitySpike(context),
-    ...evaluateHardDayClustering(context),
-    ...evaluateConsecutiveRunningDays(context),
-    ...evaluateTrainingNovelty(context)
+    capacityFinding(context),
+    adaptationFinding(context),
+    cardioLoadFinding(context),
+    mechanicalExposureFinding(context),
+    ...noveltyFindings(context),
+    decisionRiskFinding(context),
+    ...plannedVsObservedDecisionRiskFindings(context)
   ];
 }
 
-export function evaluateWeeklyVolumeGrowth(context: RiskContext): RiskFinding[] {
-  const ruleId = "weekly_volume_growth";
-  const rule = context.config.rules.weeklyVolumeGrowth;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const current = runsInWindow(context.runs, context.asOfDate, 0, days);
-  const prior = runsInWindow(context.runs, context.asOfDate, days, days);
-  if (current.length < (rule.minActivities ?? 0) || mileage(current) < (rule.minMileage ?? 0)) return [];
-  if (mileage(prior) < (rule.minMileage ?? 0)) {
-    return [
-      makeFinding(context, rule, {
-        ruleId,
-        category: "data_quality",
-        severity: "info",
-        title: "Prior-week mileage baseline is limited",
-        message: "Prior 7-day mileage is too low to compare weekly volume growth confidently.",
-        observedValue: round1(mileage(prior)),
-        thresholdValue: rule.minMileage,
-        unit: "mi",
-        lookbackDays: days * 2,
-        evidence: { currentMileage: round1(mileage(current)), priorMileage: round1(mileage(prior)) }
-      })
-    ];
-  }
-
-  const growth = mileage(current) / mileage(prior) - 1;
-  const severity = severityFromThresholds(growth, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  const growthDirection = growth >= 0 ? "above" : "below";
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "load",
-      severity,
-      title: severity === "green" ? "Weekly volume growth is within guardrails" : "Weekly volume increased",
-      message: `Current ${days}-day mileage is ${percent(Math.abs(growth))} ${growthDirection} the prior ${days} days.`,
-      observedValue: round2(growth),
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "growth_ratio",
-      lookbackDays: days * 2,
-      evidence: { currentMileage: round1(mileage(current)), priorMileage: round1(mileage(prior)), currentRunCount: current.length, priorRunCount: prior.length }
-    })
-  ];
-}
-
-export function evaluateAcwr(context: RiskContext): RiskFinding[] {
-  const ruleId = "acwr_mileage";
-  const rule = context.config.rules.acwrMileage;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const baselineDays = rule.baselineDays ?? defaultBaselineDays;
-  const current = runsInWindow(context.runs, context.asOfDate, 0, days);
-  const baseline = runsInWindow(context.runs, context.asOfDate, days, baselineDays);
-  const baselineMileage = mileage(baseline);
-  if (current.length < (rule.minActivities ?? 0) && mileage(current) < (rule.minMileage ?? 0)) return [];
-  if (baselineMileage < (rule.minMileage ?? 0)) {
-    return [
-      makeFinding(context, rule, {
-        ruleId,
-        category: "data_quality",
-        severity: "info",
-        title: "Chronic mileage baseline is limited",
-        message: "Trailing mileage baseline is too low to compute acute/chronic workload ratio confidently.",
-        observedValue: round1(baselineMileage),
-        thresholdValue: rule.minMileage,
-        unit: "mi",
-        lookbackDays: days + baselineDays,
-        evidence: { currentMileage: round1(mileage(current)), baselineMileage: round1(baselineMileage), baselineDays }
-      })
-    ];
-  }
-
-  const averageBaselineWeek = baselineMileage / (baselineDays / days);
-  const ratio = mileage(current) / averageBaselineWeek;
-  const severity = severityFromThresholds(ratio, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "load",
-      severity,
-      title: severity === "green" ? "Acute mileage load is within guardrails" : "Acute mileage load is elevated",
-      message: `Current ${days}-day mileage is ${round2(ratio)}x the trailing weekly baseline.`,
-      observedValue: round2(ratio),
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "ratio",
-      lookbackDays: days + baselineDays,
-      evidence: { currentMileage: round1(mileage(current)), averageBaselineWeek: round1(averageBaselineWeek), baselineMileage: round1(baselineMileage) }
-    })
-  ];
-}
-
-export function evaluateConsecutiveBuildWeeks(context: RiskContext): RiskFinding[] {
-  const ruleId = "consecutive_build_weeks";
-  const rule = context.config.rules.consecutiveBuildWeeks;
-  if (!rule.enabled) return [];
-
-  const buckets = weekBuckets(context, rule).filter((bucket) => bucket.mileage > 0);
-  if (buckets.flatMap((bucket) => bucket.runs).length < (rule.minActivities ?? 0)) return [];
-  let streak = 0;
-  for (let index = buckets.length - 1; index > 0; index -= 1) {
-    if (buckets[index].mileage > buckets[index - 1].mileage) streak += 1;
-    else break;
-  }
-
-  const severity = severityFromThresholds(streak, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "load",
-      severity,
-      title: severity === "green" ? "Build-week streak is within guardrails" : "Consecutive build weeks detected",
-      message: `Weekly mileage has increased for ${streak} consecutive week-to-week comparisons.`,
-      observedValue: streak,
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "weeks",
-      lookbackDays: rule.baselineDays ?? 56,
-      evidence: { weeklyMileage: buckets.map((bucket) => round1(bucket.mileage)), weeks: buckets.map(({ startDate, endDate }) => ({ startDate, endDate })) }
-    })
-  ];
-}
-
-export function evaluateLongRunPercentage(context: RiskContext): RiskFinding[] {
-  const ruleId = "long_run_percentage";
-  const rule = context.config.rules.longRunPercentage;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const current = runsInWindow(context.runs, context.asOfDate, 0, days);
-  const totalMileage = mileage(current);
-  if (totalMileage < (rule.minMileage ?? 0) || current.length < (rule.minActivities ?? 0)) return [];
-
-  const longest = longestRun(current);
-  const share = miles(longest?.distanceMeters) / totalMileage;
-  const severity = severityFromThresholds(share, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "long_run",
-      severity,
-      title: severity === "green" ? "Long run share is within guardrails" : "Long run share is elevated",
-      message: `Longest run was ${percent(share)} of ${days}-day mileage.`,
-      observedValue: round2(share),
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "share",
-      lookbackDays: days,
-      evidence: { totalMileage: round1(totalMileage), longestRunMiles: round1(miles(longest?.distanceMeters)), runCount: current.length, longestRunId: longest?.providerActivityId }
-    })
-  ];
-}
-
-export function evaluateLongRunJump(context: RiskContext): RiskFinding[] {
-  const ruleId = "long_run_jump";
-  const rule = context.config.rules.longRunJump;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const baselineDays = rule.baselineDays ?? defaultBaselineDays;
-  const current = runsInWindow(context.runs, context.asOfDate, 0, days);
-  if (mileage(current) < (rule.minMileage ?? 0)) return [];
-  const currentLongest = miles(longestRun(current)?.distanceMeters);
-  const baselineBuckets = weekBuckets(context, { ...rule, baselineDays }).slice(0, -1);
-  const baselineLongRuns = baselineBuckets.map((bucket) => bucket.longestRunMiles).filter((value) => value > 0);
-  if (baselineLongRuns.length < Math.max(1, Math.floor((rule.minActivities ?? 4) / 2))) return [];
-  const baselineAverage = average(baselineLongRuns);
-  if (!baselineAverage) return [];
-  const jump = currentLongest / baselineAverage - 1;
-  const severity = severityFromThresholds(jump, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  const jumpDirection = jump >= 0 ? "above" : "below";
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "long_run",
-      severity,
-      title: severity === "green" ? "Long run change is within guardrails" : "Long run increased from baseline",
-      message: `Current long run is ${percent(Math.abs(jump))} ${jumpDirection} the prior long-run baseline.`,
-      observedValue: round2(jump),
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "growth_ratio",
-      lookbackDays: days + baselineDays,
-      evidence: { currentLongestMiles: round1(currentLongest), baselineAverageLongestMiles: round1(baselineAverage), baselineLongRuns: baselineLongRuns.map(round1) }
-    })
-  ];
-}
-
-export function evaluateHardSessionCount(context: RiskContext): RiskFinding[] {
-  const ruleId = "hard_session_count";
-  const rule = context.config.rules.hardSessionCount;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const hardRuns = hardRunsInWindow(context, 0, days);
-  const severity = severityFromThresholds(hardRuns.length, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "intensity",
-      severity,
-      title: severity === "green" ? "Hard session count is within guardrails" : "Hard session count is elevated",
-      message: `${hardRuns.length} inferred hard sessions occurred in the last ${days} days.`,
-      observedValue: hardRuns.length,
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "sessions",
-      lookbackDays: days,
-      evidence: { hardRuns: hardRuns.map(hardRunEvidence) }
-    })
-  ];
-}
-
-export function evaluateIntensitySpike(context: RiskContext): RiskFinding[] {
-  const ruleId = "intensity_spike";
-  const rule = context.config.rules.intensitySpike;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const baselineDays = rule.baselineDays ?? defaultBaselineDays;
-  const currentProxy = hardLoadProxy(context, 0, days);
-  const baselineProxy = hardLoadProxy(context, days, baselineDays);
-  const averageBaseline = baselineProxy.value / (baselineDays / days);
-  if (!currentProxy.value || !averageBaseline) return [];
-  const increase = currentProxy.value / averageBaseline - 1;
-  const severity = severityFromThresholds(increase, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  const increaseDirection = increase >= 0 ? "above" : "below";
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "intensity",
-      severity,
-      confidence: currentProxy.confidence,
-      title: severity === "green" ? "Intensity load is within guardrails" : "Intensity load increased",
-      message: `Current hard-load proxy is ${percent(Math.abs(increase))} ${increaseDirection} the trailing baseline.`,
-      observedValue: round2(increase),
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "growth_ratio",
-      lookbackDays: days + baselineDays,
-      evidence: { proxy: currentProxy.proxy, currentValue: round1(currentProxy.value), averageBaselineValue: round1(averageBaseline), baselineValue: round1(baselineProxy.value) }
-    })
-  ];
-}
-
-export function evaluateHardDayClustering(context: RiskContext): RiskFinding[] {
-  const ruleId = "hard_day_clustering";
-  const rule = context.config.rules.hardDayClustering;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? defaultLookbackDays;
-  const hardRuns = hardRunsInWindow(context, 0, days).sort(byOldestClassification);
-  const currentRuns = runsInWindow(context.runs, context.asOfDate, 0, days);
-  const long = longestRun(currentRuns);
-  const findings: RiskFinding[] = [];
-  const backToBackDays = rule.thresholds.hardBackToBackDays ?? 1;
-  const threeHardDays = rule.thresholds.threeHardSessionsDays ?? 5;
-  const hardLongHours = rule.thresholds.hardLongHours ?? 24;
-  const hardLongHardDays = rule.thresholds.hardLongHardDays ?? 4;
-
-  if (hasBackToBackHardRuns(hardRuns, backToBackDays)) {
-    findings.push(makeFinding(context, rule, {
-      ruleId,
-      category: "recovery",
-      severity: configuredSeverity(rule, "backToBackHard", "yellow"),
-      title: "Hard sessions are close together",
-      message: "Hard sessions occurred on back-to-back days.",
-      observedValue: backToBackDays,
-      thresholdValue: backToBackDays,
-      unit: "days",
-      lookbackDays: days,
-      evidence: { hardRuns: hardRuns.map(hardRunEvidence) }
-    }));
-  }
-
-  if (long && hardRuns.some((hardRun) => Math.abs(hoursBetween(hardRun.activity, long)) <= hardLongHours && hardRun.activity.providerActivityId !== long.providerActivityId)) {
-    findings.push(makeFinding(context, rule, {
-      ruleId,
-      category: "recovery",
-      severity: configuredSeverity(rule, "hardNearLong", "yellow"),
-      title: "Hard session clustered with long run",
-      message: `A hard session occurred within ${hardLongHours} hours of the long run.`,
-      observedValue: hardLongHours,
-      thresholdValue: hardLongHours,
-      unit: "hours",
-      lookbackDays: days,
-      evidence: { longestRun: activityEvidence(long), hardRuns: hardRuns.map(hardRunEvidence) }
-    }));
-  }
-
-  if (hasThreeHardRunsWithinDays(hardRuns, threeHardDays)) {
-    findings.push(makeFinding(context, rule, {
-      ruleId,
-      category: "recovery",
-      severity: configuredSeverity(rule, "threeHardSessions", "red"),
-      title: "Three hard sessions are clustered",
-      message: `Three hard sessions occurred within ${threeHardDays} days.`,
-      observedValue: 3,
-      thresholdValue: 3,
-      unit: "sessions",
-      lookbackDays: days,
-      evidence: { hardRuns: hardRuns.map(hardRunEvidence) }
-    }));
-  }
-
-  if (long && hasHardLongHardPattern(hardRuns, long, hardLongHardDays)) {
-    findings.push(makeFinding(context, rule, {
-      ruleId,
-      category: "recovery",
-      severity: configuredSeverity(rule, "hardLongHard", "red"),
-      title: "Hard-long-hard pattern detected",
-      message: `Hard sessions appear on both sides of the long run within ${hardLongHardDays} days.`,
-      observedValue: hardLongHardDays,
-      thresholdValue: hardLongHardDays,
-      unit: "days",
-      lookbackDays: days,
-      evidence: { longestRun: activityEvidence(long), hardRuns: hardRuns.map(hardRunEvidence) }
-    }));
-  }
-
-  if (!findings.length && rule.includeGreen) {
-    findings.push(makeFinding(context, rule, {
-      ruleId,
-      category: "recovery",
-      severity: "green",
-      title: "Hard-day spacing is within guardrails",
-      message: "No configured hard-day clustering pattern was detected.",
-      observedValue: hardRuns.length,
-      thresholdValue: rule.thresholds.threeHardSessionsDays,
-      unit: "hard_sessions",
-      lookbackDays: days,
-      evidence: { hardRuns: hardRuns.map(hardRunEvidence) }
-    }));
-  }
-
-  return dedupeRuleFindings(findings);
-}
-
-export function evaluateConsecutiveRunningDays(context: RiskContext): RiskFinding[] {
-  const ruleId = "consecutive_running_days";
-  const rule = context.config.rules.consecutiveRunningDays;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? 14;
-  const streak = consecutiveRunDays(runsInWindow(context.runs, context.asOfDate, 0, days), context.asOfDate);
-  const severity = severityFromThresholds(streak, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "recovery",
-      severity,
-      title: severity === "green" ? "Running streak is within guardrails" : "Running streak is elevated",
-      message: `${streak} consecutive running days detected.`,
-      observedValue: streak,
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "days",
-      lookbackDays: days,
-      evidence: { streakDays: streak }
-    })
-  ];
-}
-
-export function evaluateTrainingNovelty(context: RiskContext): RiskFinding[] {
-  const ruleId = "training_novelty";
-  const rule = context.config.rules.trainingNovelty;
-  if (!rule.enabled) return [];
-
-  const currentDays = rule.lookbackDays ?? 14;
-  const baselineDays = rule.baselineDays ?? 56;
-  const current = aggregate(runsInWindow(context.runs, context.asOfDate, 0, currentDays), context);
-  const baseline = aggregate(runsInWindow(context.runs, context.asOfDate, currentDays, baselineDays), context);
-  if (baseline.runCount < (rule.minActivities ?? 0)) return [];
-
-  const currentScale = currentDays / 7;
-  const baselineScale = baselineDays / 7;
-  const components = {
-    mileage: componentNovelty(current.mileage / currentScale, baseline.mileage / baselineScale, rule),
-    runFrequency: componentNovelty(current.runCount / currentScale, baseline.runCount / baselineScale, rule),
-    elevationGain: componentNovelty(current.elevationGainMeters / currentScale, baseline.elevationGainMeters / baselineScale, rule),
-    hardSessions: componentNovelty(current.hardSessionCount / currentScale, baseline.hardSessionCount / baselineScale, rule),
-    longRun: componentNovelty(current.longestRunMiles, baseline.longestRunMiles, rule)
+export function buildLoadRiskContext(activities: Activity[], asOfDate = new Date(), config = defaultRiskConfig, plannedWorkout?: PlannedWorkoutExposure) {
+  const context = buildFrameworkContext(activities, asOfDate, config, plannedWorkout);
+  return {
+    capacity: context.capacity,
+    adaptation: context.adaptation,
+    cardioLoad: context.cardioLoad7,
+    mechanicalExposure: context.mechanical7,
+    noveltySignals: context.noveltySignals,
+    decisionRisk: context.decisionRisk
   };
-  const score = Object.values(components).reduce((total, component) => total + component.score, 0);
-  const severity = severityFromThresholds(score, rule);
-  if (!shouldEmit(severity, rule)) return [];
-  return [
-    makeFinding(context, rule, {
-      ruleId,
-      category: "novelty",
-      severity,
-      title: severity === "green" ? "Training block novelty is within guardrails" : "Training block novelty is elevated",
-      message: severity === "green" ? "Current training block is close to the recent baseline." : severity === "red" ? "Current training block differs substantially from the recent baseline." : "Current training block differs from the recent baseline.",
-      observedValue: score,
-      thresholdValue: thresholdForSeverity(severity, rule),
-      unit: "novelty_points",
-      lookbackDays: currentDays + baselineDays,
-      evidence: { components, current, baseline }
-    })
-  ];
 }
 
-export function evaluateDataQuality(context: RiskContext): RiskFinding[] {
-  const ruleId = "data_quality";
-  const rule = context.config.rules.dataQuality;
-  if (!rule.enabled) return [];
-
-  const days = rule.lookbackDays ?? 56;
-  const runs = runsInWindow(context.runs, context.asOfDate, 0, days);
-  const findings: RiskFinding[] = [];
-  if (runs.length < (rule.minActivities ?? 0)) {
-    findings.push(makeFinding(context, rule, {
-      ruleId,
-      category: "data_quality",
-      severity: configuredSeverity(rule, "limitedHistory", "info"),
-      title: "Limited running history",
-      message: "Stored activity history is limited, so some risk findings may have lower confidence.",
-      observedValue: runs.length,
-      thresholdValue: rule.minActivities,
-      unit: "runs",
-      lookbackDays: days,
-      evidence: { runCount: runs.length }
-    }));
-  }
-
-  if (!runs.some((run) => run.averageHeartRate !== undefined)) {
-    findings.push(dataAvailabilityFinding(context, rule, "averageHeartRate", "Heart-rate data is missing from recent runs."));
-  }
-  if (!runs.some((run) => run.relativeEffort !== undefined || run.perceivedEffort !== undefined)) {
-    findings.push(dataAvailabilityFinding(context, rule, "relativeEffort", "Relative-effort data is missing from recent runs."));
-  }
-  if (!runs.some((run) => run.averagePaceSecondsPerKm !== undefined) || runs.filter((run) => run.averagePaceSecondsPerKm !== undefined).length < (rule.thresholds.paceBaselineRuns ?? 0)) {
-    findings.push(dataAvailabilityFinding(context, rule, "averagePaceSecondsPerKm", "Pace data is limited, so hard-session inference may rely on names or effort fields."));
-  }
-  findings.push(dataAvailabilityFinding(context, rule, "gearId", "Gear or shoe data is not currently stored on activities."));
-
-  return findings;
-}
-
-function buildRiskContext(activities: Activity[], asOfDate: Date, config: RiskEngineConfig): RiskContext {
-  const runs = activities.filter(isRun).sort(byOldestStartDate);
-  const context: RiskContext = { asOfDate, config, runs, hardRuns: [] };
-  context.hardRuns = runs.map((activity) => classifyHardRun(activity, context));
-  return context;
-}
-
-function classifyHardRun(activity: Activity, context: RiskContext): HardRunClassification {
-  const config = context.config.hardRunClassification;
-  if (!config.enabled) return { activity, isHard: false, reasons: [], evidence: {} };
-
-  const baselineRuns = runsInWindow(context.runs, context.asOfDate, 0, config.baselineDays ?? 56);
-  const paceBaseline = medianDefined(baselineRuns.map((run) => run.averagePaceSecondsPerKm));
-  const heartRateBaseline = averageDefined(baselineRuns.map((run) => run.averageHeartRate));
-  const relativeEffortBaseline = averageDefined(baselineRuns.map((run) => run.relativeEffort ?? run.perceivedEffort));
-  const reasons: string[] = [];
-  const evidence: Record<string, unknown> = {
-    activity: activityEvidence(activity),
-    paceBaseline,
-    heartRateBaseline,
-    relativeEffortBaseline
-  };
-
-  const name = activity.name?.toLowerCase() ?? "";
-  const matchedKeyword = config.nameKeywords.find((keyword) => name.includes(keyword));
-  if (matchedKeyword) reasons.push(`name_keyword:${matchedKeyword}`);
-
-  const paceThreshold = config.thresholds.paceFasterThanBaselinePct ?? 0;
-  if (activity.averagePaceSecondsPerKm && paceBaseline && activity.averagePaceSecondsPerKm <= paceBaseline * (1 - paceThreshold)) {
-    reasons.push("pace_above_baseline");
-  }
-
-  const heartRateThreshold = config.thresholds.heartRateAboveBaselinePct ?? 0;
-  if (activity.averageHeartRate && heartRateBaseline && activity.averageHeartRate >= heartRateBaseline * (1 + heartRateThreshold)) {
-    reasons.push("heart_rate_above_baseline");
-  }
-
-  const relativeEffort = activity.relativeEffort ?? activity.perceivedEffort;
-  const relativeEffortHigh = config.thresholds.relativeEffortHigh;
-  const relativeEffortMultiplier = config.thresholds.relativeEffortMultiplier ?? 0;
-  if (relativeEffort !== undefined && relativeEffortHigh !== undefined && relativeEffort >= relativeEffortHigh) {
-    reasons.push("relative_effort_high");
-  } else if (relativeEffort !== undefined && relativeEffortBaseline && relativeEffort >= relativeEffortBaseline * relativeEffortMultiplier) {
-    reasons.push("relative_effort_above_baseline");
-  }
-
-  const perceivedEffortHigh = config.thresholds.perceivedEffortHigh;
-  if (activity.perceivedEffort !== undefined && perceivedEffortHigh !== undefined && activity.perceivedEffort >= perceivedEffortHigh) {
-    reasons.push("perceived_effort_high");
-  }
-
-  return { activity, isHard: reasons.length > 0, reasons, evidence };
-}
-
-function runsInWindow(runs: Activity[], asOfDate: Date, offsetDays: number, days: number) {
-  const end = asOfDate.getTime() - offsetDays * millisecondsPerDay;
-  const start = end - days * millisecondsPerDay;
-  return runs.filter((run) => {
-    const time = new Date(run.startDate).getTime();
-    return time > start && time <= end;
+function capacityFinding(context: FrameworkContext): RiskFinding {
+  const severity = context.capacity.classification === "unknown" ? "info" : "green";
+  return makeFinding(context, {
+    ruleId: "capacity_context",
+    category: "capacity",
+    severity,
+    confidence: context.capacity.confidence,
+    title: "Capacity context",
+    message: capacityMessage(context.capacity),
+    observedValue: context.capacity.historicalPeakWeeklyMileage,
+    unit: "mi_per_week",
+    lookbackDays: 1825,
+    evidence: { capacity: context.capacity }
   });
 }
 
-function weekBuckets(context: RiskContext, rule: Pick<RiskRuleConfig, "baselineDays" | "lookbackDays">): WeekBucket[] {
-  const days = rule.lookbackDays ?? 7;
-  const totalDays = rule.baselineDays ?? 56;
-  const bucketCount = Math.max(1, Math.floor(totalDays / days));
-  const buckets: WeekBucket[] = [];
-  for (let index = bucketCount - 1; index >= 0; index -= 1) {
-    const offset = index * days;
-    const runs = runsInWindow(context.runs, context.asOfDate, offset, days);
-    const start = new Date(context.asOfDate.getTime() - (offset + days) * millisecondsPerDay);
-    const end = new Date(context.asOfDate.getTime() - offset * millisecondsPerDay);
-    buckets.push({
-      startDate: isoDate(start),
-      endDate: isoDate(end),
-      runs,
-      mileage: mileage(runs),
-      longestRunMiles: miles(longestRun(runs)?.distanceMeters),
-      hardSessionCount: runs.filter((run) => isHardRun(context, run)).length,
-      elevationGainMeters: sum(runs.map((run) => run.elevationGainMeters))
-    });
+function adaptationFinding(context: FrameworkContext): RiskFinding {
+  const severity =
+    context.capacity.classification === "high" && context.adaptation.classification === "low"
+      ? "yellow"
+      : context.adaptation.classification === "unknown"
+        ? "info"
+        : "green";
+  return makeFinding(context, {
+    ruleId: "adaptation_context",
+    category: "adaptation",
+    severity,
+    confidence: context.adaptation.confidence,
+    title: "Current adaptation context",
+    message: adaptationMessage(context.capacity, context.adaptation),
+    observedValue: context.adaptation.mileagePerWeek28Days,
+    unit: "mi_per_week",
+    lookbackDays: 42,
+    evidence: { capacity: context.capacity, adaptation: context.adaptation }
+  });
+}
+
+function cardioLoadFinding(context: FrameworkContext): RiskFinding {
+  return makeFinding(context, {
+    ruleId: "cardio_load_7d",
+    category: "cardio_load",
+    severity: context.cardioLoad7.cardioLoadScore === undefined ? "info" : "green",
+    confidence: context.cardioLoad7.cardioLoadConfidence,
+    title: "Cardio load",
+    message: context.cardioLoad7.cardioLoadScore === undefined
+      ? "No recent Strava relative-effort data is available for cardio load."
+      : `Recent cardio load is ${context.cardioLoad7.cardioLoadScore} from ${context.cardioLoad7.cardioLoadSource}.`,
+    observedValue: context.cardioLoad7.cardioLoadScore,
+    unit: "cardio_load_score",
+    lookbackDays: 7,
+    evidence: { cardioLoad: context.cardioLoad7 }
+  });
+}
+
+function mechanicalExposureFinding(context: FrameworkContext): RiskFinding {
+  return makeFinding(context, {
+    ruleId: "mechanical_exposure_7d",
+    category: "mechanical_exposure",
+    severity: "green",
+    confidence: context.mechanical7.confidence,
+    title: "Mechanical exposure",
+    message: `Recent mechanical exposure is ${context.mechanical7.distanceMiles} miles with a ${context.mechanical7.longestRunMiles} mile long run.`,
+    observedValue: context.mechanical7.distanceMiles,
+    unit: "mi",
+    lookbackDays: 7,
+    evidence: { mechanicalExposure: context.mechanical7 }
+  });
+}
+
+function noveltyFindings(context: FrameworkContext): RiskFinding[] {
+  return context.noveltySignals.map((signal) => makeFinding(context, {
+    ruleId: signal.id,
+    category: "novelty",
+    severity: signal.severity,
+    confidence: signal.confidence,
+    title: signal.label,
+    message: signal.message,
+    observedValue: signal.relativeRatio ?? signal.currentValue,
+    unit: signal.unit,
+    lookbackDays: 49,
+    evidence: { noveltySignal: signal }
+  }));
+}
+
+function decisionRiskFinding(context: FrameworkContext): RiskFinding {
+  const riskDrivers = [
+    ...context.noveltySignals.filter((signal) => signal.severity === "yellow" || signal.severity === "red"),
+    hardDayClusterSignal(context)
+  ].filter((signal): signal is NoveltySignal => Boolean(signal));
+  const strongest = strongestSeverity(riskDrivers.map((signal) => signal.severity));
+  const severity = strongest === "red" ? "red" : strongest === "yellow" ? "yellow" : "green";
+  return makeFinding(context, {
+    ruleId: "decision_risk_observed",
+    category: "decision_risk",
+    severity,
+    confidence: riskDrivers.some((signal) => signal.confidence === "low") ? "low" : "medium",
+    title: "Observed decision risk",
+    message: severity === "green"
+      ? "Observed training signals do not show unusual exposure that should dominate today's decision."
+      : "Observed training includes unusual exposure that should shape today's recommendation.",
+    observedValue: riskDrivers.length,
+    unit: "risk_drivers",
+    lookbackDays: 49,
+    evidence: {
+      riskDrivers,
+      decisionRisk: context.decisionRisk,
+      capacity: context.capacity,
+      adaptation: context.adaptation
+    }
+  });
+}
+
+function plannedVsObservedDecisionRiskFindings(context: FrameworkContext): RiskFinding[] {
+  const planned = context.plannedWorkout;
+  if (!planned) return [];
+
+  const riskDrivers = plannedRiskDrivers(context, planned);
+  const strongest = strongestSeverity(riskDrivers.map((signal) => signal.severity));
+  const severity = strongest === "red" ? "red" : strongest === "yellow" ? "yellow" : "green";
+  return [
+    makeFinding(context, {
+      ruleId: "decision_risk_planned_vs_observed",
+      category: "decision_risk",
+      severity,
+      confidence: planned.confidence,
+      title: "Planned-vs-observed decision risk",
+      message: plannedDecisionRiskMessage(severity, planned),
+      observedValue: riskDrivers.length,
+      unit: "risk_drivers",
+      lookbackDays: 49,
+      evidence: {
+        plannedWorkout: planned,
+        riskDrivers,
+        adaptation: context.adaptation,
+        observedDecisionRisk: context.decisionRisk,
+        plannedDecisionRisk: plannedDecisionRiskContext(planned)
+      }
+    })
+  ];
+}
+
+export function evaluateDataQuality(context: FrameworkContext): RiskFinding[] {
+  const recentRuns = runsInWindow(context.runs, context.asOfDate, 0, 56);
+  const findings: RiskFinding[] = [];
+  if (recentRuns.length < 8) {
+    findings.push(makeFinding(context, {
+      ruleId: "data_quality_limited_history",
+      category: "data_quality",
+      severity: "info",
+      confidence: "high",
+      title: "Limited running history",
+      message: "Stored activity history is limited, so capacity, adaptation, and novelty signals have lower confidence.",
+      observedValue: recentRuns.length,
+      thresholdValue: 8,
+      unit: "runs",
+      lookbackDays: 56,
+      evidence: { runCount: recentRuns.length }
+    }));
   }
-  return buckets;
+  if (!recentRuns.some((run) => run.relativeEffort !== undefined || run.perceivedEffort !== undefined)) {
+    findings.push(dataAvailabilityFinding(context, "relativeEffort", "Cardio-load data is missing from recent runs."));
+  }
+  if (!recentRuns.some((run) => run.streamSummary)) {
+    findings.push(dataAvailabilityFinding(context, "streamSummary", "Strava streams are not synced yet; fast-running exposure uses low-confidence fallbacks."));
+  }
+  return findings;
 }
 
-function hardRunsInWindow(context: RiskContext, offsetDays: number, days: number) {
-  const runs = new Set(runsInWindow(context.runs, context.asOfDate, offsetDays, days).map((run) => run.providerActivityId));
-  return context.hardRuns.filter((classification) => classification.isHard && runs.has(classification.activity.providerActivityId));
-}
-
-function hardLoadProxy(context: RiskContext, offsetDays: number, days: number): HardLoadProxy {
-  const windowRuns = runsInWindow(context.runs, context.asOfDate, offsetDays, days);
-  const relativeEfforts = windowRuns.map((run) => run.relativeEffort).filter(isNumber);
-  if (relativeEfforts.length) return { proxy: "relative_effort", value: sum(relativeEfforts), confidence: "high" as RiskConfidence };
-
-  const heartRateLoads = windowRuns
-    .map((run) => run.averageHeartRate && run.movingTimeSeconds ? run.averageHeartRate * (run.movingTimeSeconds / 3600) : undefined)
-    .filter(isNumber);
-  if (heartRateLoads.length) return { proxy: "heart_rate_time", value: sum(heartRateLoads), confidence: "high" as RiskConfidence };
-
-  const paceProxy = windowRuns
-    .map((run) => {
-      const classification = context.hardRuns.find((hardRun) => hardRun.activity.providerActivityId === run.providerActivityId);
-      return classification?.reasons.includes("pace_above_baseline") ? miles(run.distanceMeters) : 0;
-    });
-  if (paceProxy.some((value) => value > 0)) return { proxy: "pace_deviation_miles", value: sum(paceProxy), confidence: "medium" as RiskConfidence };
-
-  return { proxy: "hard_session_count", value: hardRunsInWindow(context, offsetDays, days).length, confidence: "medium" as RiskConfidence };
-}
-
-function aggregate(runs: Activity[], context: RiskContext) {
+function buildFrameworkContext(activities: Activity[], asOfDate: Date, config: RiskEngineConfig, plannedWorkout?: PlannedWorkoutExposure): FrameworkContext {
+  const runs = activities.filter(isRun).sort(byOldestStartDate);
+  const hardRuns = runs.map((activity) => classifyHardRun(activity, runs, asOfDate, config));
+  const capacity = capacityContext(runs, asOfDate);
+  const cardioLoad7 = cardioLoad(runsInWindow(runs, asOfDate, 0, 7), 7);
+  const cardioLoad28 = cardioLoad(runsInWindow(runs, asOfDate, 0, 28), 28);
+  const mechanical3 = mechanicalExposure(runsInWindow(runs, asOfDate, 0, 3), hardRuns, 3);
+  const mechanical7 = mechanicalExposure(runsInWindow(runs, asOfDate, 0, 7), hardRuns, 7);
+  const mechanical28 = mechanicalExposure(runsInWindow(runs, asOfDate, 0, 28), hardRuns, 28);
+  const adaptation = adaptationContext(runs, hardRuns, asOfDate, cardioLoad28, mechanical28);
+  const baselineRuns = runsInWindow(runs, asOfDate, 7, 42);
+  const baselineCardio = cardioLoad(baselineRuns, 42);
+  const baselineMechanical = mechanicalExposure(baselineRuns, hardRuns, 42);
+  const noveltySignals = noveltySignalsForContext(runs, asOfDate, cardioLoad7, baselineCardio, mechanical3, mechanical7, baselineMechanical);
   return {
-    mileage: round1(mileage(runs)),
-    runCount: runs.length,
-    elevationGainMeters: round1(sum(runs.map((run) => run.elevationGainMeters))),
-    hardSessionCount: runs.filter((run) => isHardRun(context, run)).length,
-    longestRunMiles: round1(miles(longestRun(runs)?.distanceMeters))
+    asOfDate,
+    config,
+    runs,
+    hardRuns,
+    capacity,
+    adaptation,
+    cardioLoad7,
+    cardioLoad28,
+    mechanical3,
+    mechanical7,
+    mechanical28,
+    noveltySignals,
+    decisionRisk: {
+      scope: "observed",
+      observedWindowDays: 49,
+      plannedWorkoutAvailable: false,
+      painFatigueInjuryFlagsAvailable: false,
+      recommendationUse: "llm_context"
+    },
+    plannedWorkout
   };
 }
 
-function componentNovelty(current: number, baseline: number, rule: RiskRuleConfig) {
-  if (!baseline) return { ratio: current ? undefined : 0, score: 0 };
-  const ratio = current / baseline;
-  const score = ratio >= (rule.thresholds.componentRedRatio ?? Infinity) ? 2 : ratio >= (rule.thresholds.componentYellowRatio ?? Infinity) ? 1 : 0;
-  return { ratio: round2(ratio), score, current: round1(current), baseline: round1(baseline) };
+function capacityContext(runs: Activity[], asOfDate: Date): CapacityContext {
+  const runs182 = runsInWindow(runs, asOfDate, 0, 182);
+  const runs730 = runsInWindow(runs, asOfDate, 0, 730);
+  const runs1825 = runsInWindow(runs, asOfDate, 0, 1825);
+  const peakWeekly = Math.max(0, ...weekBucketsForRuns(runs1825, asOfDate, 1825).map((bucket) => bucket.mileage));
+  const longRun = miles(longestRun(runs1825)?.distanceMeters);
+  const durableMileagePerWeek = mileage(runs182) / 26;
+  const fastestEfforts = capacityFastestEfforts(runs1825);
+  const bestEffortClass = capacityClassFromBestEfforts(fastestEfforts);
+  const activityClass = peakWeekly >= 35 || longRun >= 14 || runs730.length >= 180
+    ? "high"
+    : peakWeekly >= 15 || longRun >= 8 || runs182.length >= 40
+      ? "moderate"
+      : runs1825.length
+        ? "low"
+        : "unknown";
+  const classification = strongerCapacityClass(activityClass, bestEffortClass);
+  return {
+    source: "strava_activity",
+    confidence: runs1825.length >= 20 ? "medium" : "low",
+    historicalPeakWeeklyMileage: round1(peakWeekly),
+    historicalLongRunMiles: round1(longRun),
+    durableMileagePerWeek: round1(durableMileagePerWeek),
+    runCountLast182Days: runs182.length,
+    runCountLast730Days: runs730.length,
+    runCountLast1825Days: runs1825.length,
+    fastestEfforts,
+    classification
+  };
 }
 
-function makeFinding(
-  context: RiskContext,
-  rule: RiskRuleConfig,
-  input: Omit<RiskFinding, "id" | "confidence" | "createdAt"> & { confidence?: RiskConfidence }
-): RiskFinding {
+function capacityFastestEfforts(runs: Activity[]) {
+  return capacityBestEffortTargets.flatMap((target) => {
+    const best = runs
+      .flatMap((activity) =>
+        (activity.bestEfforts ?? [])
+          .filter((effort) => Math.abs(effort.distanceMeters - target.meters) / target.meters <= 0.08)
+          .map((effort) => ({ activity, effort }))
+      )
+      .filter(({ effort }) => effort.elapsedTimeSeconds || effort.movingTimeSeconds)
+      .sort((left, right) =>
+        (left.effort.elapsedTimeSeconds ?? left.effort.movingTimeSeconds ?? Infinity) -
+        (right.effort.elapsedTimeSeconds ?? right.effort.movingTimeSeconds ?? Infinity)
+      )[0];
+    if (!best) return [];
+    const seconds = best.effort.elapsedTimeSeconds ?? best.effort.movingTimeSeconds ?? 0;
+    return [{
+      period: "5 years" as const,
+      distance: target.distance,
+      seconds,
+      paceSecondsPerMile: seconds / (target.meters / metersPerMile),
+      activityName: best.activity.name,
+      activityDate: best.activity.startDate.slice(0, 10)
+    }];
+  }).slice(0, 5);
+}
+
+function capacityClassFromBestEfforts(efforts: ReturnType<typeof capacityFastestEfforts>) {
+  let best: CapacityContext["classification"] = "unknown";
+  for (const effort of efforts) {
+    const target = capacityBestEffortTargets.find((candidate) => candidate.distance === effort.distance);
+    if (!target) continue;
+    if (effort.seconds <= target.highSeconds) return "high";
+    if (effort.seconds <= target.moderateSeconds) best = strongerCapacityClass(best, "moderate");
+  }
+  return best;
+}
+
+function strongerCapacityClass(left: CapacityContext["classification"], right: CapacityContext["classification"]) {
+  const order: Record<CapacityContext["classification"], number> = { unknown: 0, low: 1, moderate: 2, high: 3 };
+  return order[right] > order[left] ? right : left;
+}
+
+function adaptationContext(
+  runs: Activity[],
+  hardRuns: HardRunClassification[],
+  asOfDate: Date,
+  cardio28: CardioLoad,
+  mechanical28: MechanicalExposure
+): AdaptationContext {
+  const runs7 = runsInWindow(runs, asOfDate, 0, 7);
+  const runs28 = runsInWindow(runs, asOfDate, 0, 28);
+  const runs42 = runsInWindow(runs, asOfDate, 0, 42);
+  const mileage28 = mileage(runs28);
+  const mileagePerWeek28 = mileage28 / 4;
+  const mileagePerWeek42 = mileage(runs42) / 6;
+  const classification = mileagePerWeek28 >= 25 || mechanical28.longestRunMiles >= 10
+    ? "high"
+    : mileagePerWeek28 >= 10 || runs28.length >= 8
+      ? "moderate"
+      : runs28.length
+        ? "low"
+        : "unknown";
+  return {
+    source: "strava_activity",
+    confidence: runs28.length >= 8 ? "medium" : "low",
+    mileage7Days: round1(mileage(runs7)),
+    mileage28Days: round1(mileage28),
+    mileage42Days: round1(mileage(runs42)),
+    mileagePerWeek28Days: round1(mileagePerWeek28),
+    mileagePerWeek42Days: round1(mileagePerWeek42),
+    longRun28DaysMiles: mechanical28.longestRunMiles,
+    runCount28Days: runs28.length,
+    cardioLoad28Days: cardio28.cardioLoadScore,
+    fastRunningSeconds28Days: mechanical28.fastRunningSeconds,
+    elevationGain28DaysMeters: mechanical28.elevationGainMeters,
+    hardSessions7Days: hardRuns.filter((hardRun) => hardRun.isHard && inWindow(hardRun.activity, asOfDate, 0, 7)).length,
+    classification
+  };
+}
+
+function cardioLoad(runs: Activity[], windowDays: number): CardioLoad {
+  const scores = runs.map((run) => run.relativeEffort).filter(isNumber);
+  if (scores.length) {
+    return {
+      cardioLoadScore: round1(sum(scores)),
+      cardioLoadSource: "strava",
+      cardioLoadConfidence: scores.length >= Math.max(1, runs.length / 2) ? "high" : "medium",
+      windowDays
+    };
+  }
+  return { cardioLoadSource: "unknown", cardioLoadConfidence: "low", windowDays };
+}
+
+function mechanicalExposure(runs: Activity[], hardRuns: HardRunClassification[], windowDays: number): MechanicalExposure {
+  const fastExposure = runs.map((run) => fastExposureForActivity(run, hardRuns));
+  const streamFastSeconds = sum(fastExposure.filter((item) => item.source === "streams").map((item) => item.seconds));
+  const fallbackHardSeconds = sum(fastExposure.filter((item) => item.source === "activity_summary_fallback").map((item) => item.seconds));
+  const hasStreamFastExposure = streamFastSeconds > 0;
+  const hasFallbackFastExposure = fallbackHardSeconds > 0;
+  const fastRunningSource = hasStreamFastExposure && hasFallbackFastExposure
+    ? "mixed"
+    : hasStreamFastExposure
+      ? "streams"
+      : hasFallbackFastExposure
+        ? "activity_summary_fallback"
+        : "unavailable";
+  return {
+    source: runs.some((run) => run.streamSummary) ? "strava_streams" : "strava_activity",
+    confidence: fastRunningSource === "streams" ? "medium" : "low",
+    windowDays,
+    distanceMiles: round1(mileage(runs)),
+    durationSeconds: sum(runs.map((run) => run.movingTimeSeconds)),
+    longestRunMiles: round1(miles(longestRun(runs)?.distanceMeters)),
+    fastRunningSeconds: streamFastSeconds + fallbackHardSeconds || undefined,
+    fastRunningSource,
+    elevationGainMeters: round1(sum(runs.map((run) => run.elevationGainMeters))),
+    downhillMeters: round1(sum(runs.map((run) => run.streamSummary?.downhillMeters)))
+  };
+}
+
+function fastExposureForActivity(activity: Activity, hardRuns: HardRunClassification[]) {
+  if (activity.streamSummary) {
+    return {
+      source: "streams" as const,
+      seconds: activity.streamSummary.fastRunningSeconds ?? 0
+    };
+  }
+  const hardRun = hardRuns.find((candidate) => candidate.activity.providerActivityId === activity.providerActivityId);
+  return {
+    source: hardRun?.isHard ? "activity_summary_fallback" as const : "unavailable" as const,
+    seconds: hardRun?.isHard ? Math.min(activity.movingTimeSeconds ?? 0, 20 * 60) : 0
+  };
+}
+
+function noveltySignalsForContext(
+  runs: Activity[],
+  asOfDate: Date,
+  cardio7: CardioLoad,
+  baselineCardio: CardioLoad,
+  mechanical3: MechanicalExposure,
+  mechanical7: MechanicalExposure,
+  baselineMechanical: MechanicalExposure
+) {
+  const currentMileage = mileage(runsInWindow(runs, asOfDate, 0, 7));
+  const baselineMileage = mileage(runsInWindow(runs, asOfDate, 7, 42)) / 6;
+  const baselineLongRun = average(weekBucketsForRuns(runsInWindow(runs, asOfDate, 7, 42), asOfDate, 42).map((bucket) => bucket.longestRunMiles).filter((value) => value > 0));
+  const baselineElevation = elevationGain(runsInWindow(runs, asOfDate, 7, 42)) / 6;
+  return [
+    novelty("mileage_novelty", "Mileage novelty", "mileage", currentMileage, baselineMileage, {
+      floor: 3,
+      mildAbsolute: 3,
+      highAbsolute: 10,
+      yellowRatio: 1.2,
+      redRatio: 1.5,
+      unit: "mi",
+      source: "strava_activity",
+      confidence: "medium"
+    }),
+    novelty("long_run_novelty", "Long-run novelty", "long_run", mechanical7.longestRunMiles, baselineLongRun, {
+      floor: 3,
+      mildAbsolute: 2,
+      highAbsolute: 5,
+      yellowRatio: 1.2,
+      redRatio: 1.35,
+      unit: "mi",
+      source: "strava_activity",
+      confidence: "medium"
+    }),
+    novelty("cardio_load_novelty", "Cardio-load novelty", "cardio_load", cardio7.cardioLoadScore ?? 0, (baselineCardio.cardioLoadScore ?? 0) / 6, {
+      floor: 10,
+      mildAbsolute: 15,
+      highAbsolute: 45,
+      yellowRatio: 1.25,
+      redRatio: 1.5,
+      unit: "cardio_load_score",
+      source: cardio7.cardioLoadSource === "strava" ? "strava_effort" : "unknown",
+      confidence: cardio7.cardioLoadConfidence
+    }),
+    novelty("fast_running_novelty", "Fast-running novelty", "fast_running", mechanical7.fastRunningSeconds ?? 0, (baselineMechanical.fastRunningSeconds ?? 0) / 6, {
+      floor: 120,
+      mildAbsolute: 180,
+      highAbsolute: 900,
+      yellowRatio: 1.5,
+      redRatio: 2,
+      unit: "seconds",
+      source: mechanical7.fastRunningSource === "streams" ? "strava_streams" : mechanical7.fastRunningSource === "unavailable" ? "unknown" : "trainingtweaks_inferred",
+      confidence: mechanical7.fastRunningSource === "streams" ? "medium" : "low"
+    }),
+    novelty("elevation_novelty", "Elevation exposure novelty", "elevation", mechanical7.elevationGainMeters ?? 0, baselineElevation, {
+      floor: 30,
+      mildAbsolute: 100,
+      highAbsolute: 300,
+      yellowRatio: 1.5,
+      redRatio: 2,
+      unit: "meters",
+      source: "strava_activity",
+      confidence: "medium"
+    }),
+    novelty("acute_mechanical_novelty", "Acute mechanical novelty", "mileage", mechanical3.distanceMiles, mechanical7.distanceMiles / 2.33, {
+      floor: 2,
+      mildAbsolute: 3,
+      highAbsolute: 8,
+      yellowRatio: 1.5,
+      redRatio: 2,
+      unit: "mi",
+      source: "strava_activity",
+      confidence: "medium"
+    })
+  ];
+}
+
+function hardDayClusterSignal(context: FrameworkContext): NoveltySignal | undefined {
+  const hardRuns = context.hardRuns.filter((hardRun) => hardRun.isHard && inWindow(hardRun.activity, context.asOfDate, 0, 7)).sort(byOldestClassification);
+  const clusteredPairs = hardRuns.filter((hardRun, index) => {
+    const next = hardRuns[index + 1];
+    return next ? daysBetweenActivities(hardRun.activity, next.activity) <= 1.25 : false;
+  }).length;
+  if (!clusteredPairs) return undefined;
+  const severity = hardRuns.length >= 3 && clusteredPairs >= 2 ? "red" : "yellow";
+  return {
+    id: "hard_day_clustering",
+    label: "Hard-day clustering",
+    exposureType: "hard_day_clustering",
+    severity,
+    confidence: hardRuns.some((hardRun) => hardRun.confidence === "low") ? "low" : "medium",
+    currentValue: hardRuns.length,
+    baselineValue: 0,
+    absoluteChange: hardRuns.length,
+    unit: "sessions",
+    source: "trainingtweaks_inferred",
+    message: "Hard sessions are close together in the recent window."
+  };
+}
+
+function plannedRiskDrivers(context: FrameworkContext, planned: PlannedWorkoutExposure): NoveltySignal[] {
+  const drivers: NoveltySignal[] = [];
+  const plannedMiles = planned.targetMiles ?? 0;
+  const plannedMinutes = planned.durationMinutes ?? 0;
+  const baselineRunMiles = context.adaptation.runCount28Days
+    ? context.adaptation.mileage28Days / context.adaptation.runCount28Days
+    : 0;
+
+  if (plannedMiles > 0) {
+    drivers.push(novelty("planned_distance_vs_adaptation", "Planned distance versus adaptation", "mileage", plannedMiles, baselineRunMiles, {
+      floor: 2,
+      mildAbsolute: 2,
+      highAbsolute: 5,
+      yellowRatio: 1.5,
+      redRatio: 2,
+      unit: "mi",
+      source: planned.source === "unknown" ? "unknown" : "trainingtweaks_inferred",
+      confidence: planned.confidence
+    }));
+    drivers.push(novelty("planned_long_run_vs_adaptation", "Planned long run versus adaptation", "long_run", plannedMiles, context.adaptation.longRun28DaysMiles, {
+      floor: 3,
+      mildAbsolute: 2,
+      highAbsolute: 5,
+      yellowRatio: 1.2,
+      redRatio: 1.35,
+      unit: "mi",
+      source: planned.source === "unknown" ? "unknown" : "trainingtweaks_inferred",
+      confidence: planned.confidence
+    }));
+  }
+
+  if (plannedMinutes > 0 && context.mechanical7.durationSeconds > 0) {
+    drivers.push(novelty("planned_duration_vs_recent", "Planned duration versus recent exposure", "duration", plannedMinutes * 60, context.mechanical7.durationSeconds / Math.max(1, context.runs.filter((run) => inWindow(run, context.asOfDate, 0, 7)).length), {
+      floor: 20 * 60,
+      mildAbsolute: 15 * 60,
+      highAbsolute: 45 * 60,
+      yellowRatio: 1.5,
+      redRatio: 2,
+      unit: "seconds",
+      source: planned.source === "unknown" ? "unknown" : "trainingtweaks_inferred",
+      confidence: planned.confidence
+    }));
+  }
+
+  if (planned.intensity === "hard" || planned.intensity === "moderate" || planned.type === "workout" || planned.type === "tempo" || planned.type === "interval") {
+    const hardDayDriver = hardDayClusterSignal(context);
+    if (hardDayDriver) {
+      drivers.push({
+        ...hardDayDriver,
+        id: "planned_quality_after_recent_cluster",
+        label: "Planned quality after recent hard-day clustering",
+        message: "The planned workout is quality or moderate/hard while recent hard sessions are already clustered."
+      });
+    } else if (context.adaptation.hardSessions7Days >= 2) {
+      drivers.push({
+        id: "planned_quality_density",
+        label: "Planned quality density",
+        exposureType: "hard_day_clustering",
+        severity: "yellow",
+        confidence: planned.confidence,
+        currentValue: context.adaptation.hardSessions7Days + 1,
+        baselineValue: context.adaptation.hardSessions7Days,
+        absoluteChange: 1,
+        unit: "sessions",
+        source: "trainingtweaks_inferred",
+        message: "The planned quality workout would add to an already full recent hard-session count."
+      });
+    }
+  }
+
+  return drivers.filter((driver) => driver.severity === "yellow" || driver.severity === "red");
+}
+
+function plannedDecisionRiskContext(plannedWorkout: PlannedWorkoutExposure): DecisionRiskContext {
+  return {
+    scope: "planned_vs_observed",
+    observedWindowDays: 49,
+    plannedWorkoutAvailable: true,
+    plannedWorkout,
+    painFatigueInjuryFlagsAvailable: false,
+    recommendationUse: "llm_context"
+  };
+}
+
+function plannedDecisionRiskMessage(severity: RiskSeverity, planned: PlannedWorkoutExposure) {
+  const label = planned.type ?? "planned workout";
+  if (severity === "red") return `Today's ${label} is a high planned-vs-observed risk against recent adaptation.`;
+  if (severity === "yellow") return `Today's ${label} has planned-vs-observed risk that should shape the recommendation.`;
+  return `Today's ${label} is not unusual against recent observed adaptation.`;
+}
+
+function classifyHardRun(activity: Activity, runs: Activity[], asOfDate: Date, config: RiskEngineConfig): HardRunClassification {
+  const baselineRuns = runsInWindow(runs, asOfDate, 0, config.hardRunClassification.baselineDays ?? 56);
+  const paceBaseline = medianDefined(baselineRuns.map((run) => run.averagePaceSecondsPerKm));
+  const relativeEffortBaseline = averageDefined(baselineRuns.map((run) => run.relativeEffort ?? run.perceivedEffort));
+  const reasons: string[] = [];
+  const fastSeconds = activity.streamSummary?.fastRunningSeconds ?? 0;
+  const name = activity.name?.toLowerCase() ?? "";
+  const matchedKeyword = config.hardRunClassification.nameKeywords.find((keyword) => name.includes(keyword));
+  if (matchedKeyword) reasons.push(`name_keyword:${matchedKeyword}`);
+  if (activity.streamSummary && fastSeconds >= (config.hardRunClassification.thresholds.streamFastSeconds ?? 180)) reasons.push("stream_fast_running");
+  if (activity.averagePaceSecondsPerKm && paceBaseline && activity.averagePaceSecondsPerKm <= paceBaseline * (1 - (config.hardRunClassification.thresholds.paceFasterThanBaselinePct ?? 0.1))) {
+    reasons.push("pace_above_baseline");
+  }
+  const relativeEffort = activity.relativeEffort ?? activity.perceivedEffort;
+  if (relativeEffort !== undefined && relativeEffort >= (config.hardRunClassification.thresholds.relativeEffortHigh ?? 80)) reasons.push("relative_effort_high");
+  else if (relativeEffort !== undefined && relativeEffortBaseline && relativeEffort >= relativeEffortBaseline * (config.hardRunClassification.thresholds.relativeEffortMultiplier ?? 1.35)) reasons.push("relative_effort_above_baseline");
+  if (activity.perceivedEffort !== undefined && activity.perceivedEffort >= (config.hardRunClassification.thresholds.perceivedEffortHigh ?? 7)) reasons.push("perceived_effort_high");
+  return { activity, isHard: reasons.length > 0, reasons, confidence: activity.streamSummary ? "medium" : "low" };
+}
+
+function novelty(id: string, label: string, exposureType: NoveltySignal["exposureType"], currentValue: number, baselineValue: number, config: NoveltyConfig): NoveltySignal {
+  const absoluteChange = currentValue - baselineValue;
+  const baselineTooSmall = baselineValue < config.floor;
+  const relativeRatio = baselineTooSmall ? undefined : currentValue / baselineValue;
+  let severity: RiskSeverity = "green";
+  if (baselineTooSmall) {
+    if (currentValue >= config.highAbsolute) severity = "red";
+    else if (currentValue >= config.mildAbsolute) severity = "yellow";
+    else if (currentValue > 0) severity = "info";
+  } else if (relativeRatio !== undefined) {
+    if (relativeRatio >= config.redRatio && absoluteChange >= config.mildAbsolute) severity = "red";
+    else if (relativeRatio >= config.yellowRatio && absoluteChange > 0) severity = "yellow";
+  }
+  return {
+    id,
+    label,
+    exposureType,
+    severity,
+    confidence: config.confidence,
+    currentValue: round1(currentValue),
+    baselineValue: round1(baselineValue),
+    absoluteChange: round1(absoluteChange),
+    relativeRatio: relativeRatio === undefined ? undefined : round2(relativeRatio),
+    unit: config.unit,
+    source: config.source,
+    message: baselineTooSmall
+      ? `${label}: current ${round1(currentValue)} ${config.unit} against a near-zero adaptation baseline.`
+      : `${label}: current ${round1(currentValue)} ${config.unit} versus ${round1(baselineValue)} adaptation baseline.`
+  };
+}
+
+function makeFinding(context: FrameworkContext, input: Omit<RiskFinding, "id" | "createdAt" | "framework">): RiskFinding {
   return {
     ...input,
     id: `${input.ruleId}:${input.severity}:${isoDate(context.asOfDate)}`,
-    confidence: input.confidence ?? rule.confidence,
-    createdAt: context.asOfDate.toISOString()
+    createdAt: context.asOfDate.toISOString(),
+    framework: {
+      capacity: context.capacity,
+      adaptation: context.adaptation,
+      cardioLoad: context.cardioLoad7,
+      mechanicalExposure: context.mechanical7,
+      noveltySignals: context.noveltySignals,
+      decisionRisk: context.decisionRisk
+    }
   };
 }
 
-function dataAvailabilityFinding(context: RiskContext, rule: RiskRuleConfig, field: string, message: string) {
-  return makeFinding(context, rule, {
-    ruleId: "data_quality",
+function dataAvailabilityFinding(context: FrameworkContext, field: string, message: string) {
+  return makeFinding(context, {
+    ruleId: `data_quality_${field}`,
     category: "data_quality",
-    severity: configuredSeverity(rule, "missingField", "info"),
+    severity: "info",
+    confidence: "high",
     title: "Data field unavailable",
     message,
-    lookbackDays: rule.lookbackDays ?? 56,
+    lookbackDays: 56,
     evidence: { field, available: false }
   });
 }
 
-function severityFromThresholds(value: number, rule: RiskRuleConfig): RiskSeverity {
-  if (rule.thresholds.red !== undefined && value >= rule.thresholds.red) return "red";
-  if (rule.thresholds.yellow !== undefined && value >= rule.thresholds.yellow) return "yellow";
-  if (rule.thresholds.green !== undefined) return "green";
-  return "info";
+function capacityMessage(capacity: CapacityContext) {
+  if (capacity.classification === "unknown") return "Capacity cannot be inferred yet from stored history.";
+  return `Capacity appears ${capacity.classification} from historical Strava activity, separate from current preparedness.`;
 }
 
-function configuredSeverity(rule: RiskRuleConfig, key: string, fallback: RiskSeverity) {
-  return rule.severities?.[key] ?? fallback;
-}
-
-function thresholdForSeverity(severity: RiskSeverity, rule: RiskRuleConfig) {
-  return rule.thresholds[severity];
-}
-
-function shouldEmit(severity: RiskSeverity, rule: RiskRuleConfig) {
-  return severity === "yellow" || severity === "red" || severity === "info" || (severity === "green" && rule.includeGreen);
-}
-
-function hasBackToBackHardRuns(hardRuns: HardRunClassification[], days: number) {
-  return hardRuns.some((hardRun, index) => {
-    const next = hardRuns[index + 1];
-    return next ? daysBetweenActivities(hardRun.activity, next.activity) <= days : false;
-  });
-}
-
-function hasThreeHardRunsWithinDays(hardRuns: HardRunClassification[], days: number) {
-  return hardRuns.some((hardRun, index) => {
-    const third = hardRuns[index + 2];
-    return third ? daysBetweenActivities(hardRun.activity, third.activity) <= days : false;
-  });
-}
-
-function hasHardLongHardPattern(hardRuns: HardRunClassification[], longRun: Activity, days: number) {
-  const longTime = new Date(longRun.startDate).getTime();
-  const before = hardRuns.some((hardRun) => {
-    const time = new Date(hardRun.activity.startDate).getTime();
-    return time < longTime && (longTime - time) / millisecondsPerDay <= days;
-  });
-  const after = hardRuns.some((hardRun) => {
-    const time = new Date(hardRun.activity.startDate).getTime();
-    return time > longTime && (time - longTime) / millisecondsPerDay <= days;
-  });
-  return before && after;
-}
-
-function consecutiveRunDays(runs: Activity[], asOfDate: Date) {
-  const daysWithRuns = new Set(runs.map((run) => isoDate(new Date(run.startDate))));
-  let streak = 0;
-  for (let offset = 0; offset <= runs.length + 1; offset += 1) {
-    const date = new Date(asOfDate.getTime() - offset * millisecondsPerDay);
-    if (!daysWithRuns.has(isoDate(date))) break;
-    streak += 1;
+function adaptationMessage(capacity: CapacityContext, adaptation: AdaptationContext) {
+  if (capacity.classification === "high" && adaptation.classification === "low") {
+    return "This looks like a returning runner pattern: meaningful historical capacity, low current adaptation.";
   }
-  return streak;
+  if (capacity.classification === "low" && adaptation.classification === "low") {
+    return "This looks like a true beginner or very limited imported history: low capacity and low current adaptation.";
+  }
+  return `Current adaptation appears ${adaptation.classification} based on recent observed training.`;
 }
 
-function dedupeRuleFindings(findings: RiskFinding[]) {
-  const seen = new Set<string>();
-  return findings.filter((finding) => {
-    const key = `${finding.ruleId}:${finding.title}:${finding.severity}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+function frameworkRule(lookbackDays: number, baselineDays: number, thresholds: RiskRuleConfig["thresholds"], confidence: RiskConfidence): RiskRuleConfig {
+  return { enabled: true, includeGreen: true, lookbackDays, baselineDays, thresholds, confidence };
+}
+
+function strongestSeverity(severities: RiskSeverity[]) {
+  const order: Record<RiskSeverity, number> = { info: 0, green: 1, yellow: 2, red: 3 };
+  return severities.sort((left, right) => order[right] - order[left])[0] ?? "green";
+}
+
+function runsInWindow(runs: Activity[], asOfDate: Date, offsetDays: number, days: number) {
+  return runs.filter((run) => inWindow(run, asOfDate, offsetDays, days));
+}
+
+function inWindow(run: Activity, asOfDate: Date, offsetDays: number, days: number) {
+  const end = asOfDate.getTime() - offsetDays * millisecondsPerDay;
+  const start = end - days * millisecondsPerDay;
+  const time = new Date(run.startDate).getTime();
+  return time > start && time <= end;
+}
+
+function weekBucketsForRuns(runs: Activity[], asOfDate: Date, days: number) {
+  const bucketCount = Math.max(1, Math.floor(days / 7));
+  const buckets: Array<{ mileage: number; longestRunMiles: number }> = [];
+  for (let index = bucketCount - 1; index >= 0; index -= 1) {
+    const bucketRuns = runsInWindow(runs, asOfDate, index * 7, 7);
+    buckets.push({ mileage: mileage(bucketRuns), longestRunMiles: miles(longestRun(bucketRuns)?.distanceMeters) });
+  }
+  return buckets;
 }
 
 function isRun(activity: Activity) {
   return activity.sportType.toLowerCase().includes("run");
-}
-
-function isHardRun(context: RiskContext, activity: Activity) {
-  return Boolean(context.hardRuns.find((hardRun) => hardRun.activity.providerActivityId === activity.providerActivityId)?.isHard);
 }
 
 function longestRun(runs: Activity[]) {
@@ -889,15 +829,17 @@ function miles(meters?: number): number {
   return meters ? meters / metersPerMile : 0;
 }
 
+function elevationGain(runs: Activity[]) {
+  return sum(runs.map((run) => run.elevationGainMeters));
+}
+
 function average(values: number[]): number {
-  if (!values.length) return 0;
-  return sum(values) / values.length;
+  return values.length ? sum(values) / values.length : 0;
 }
 
 function averageDefined(values: Array<number | undefined>): number | undefined {
   const defined = values.filter(isNumber);
-  if (!defined.length) return undefined;
-  return average(defined);
+  return defined.length ? average(defined) : undefined;
 }
 
 function medianDefined(values: Array<number | undefined>): number | undefined {
@@ -909,10 +851,6 @@ function medianDefined(values: Array<number | undefined>): number | undefined {
 
 function sum(values: Array<number | undefined>): number {
   return values.reduce<number>((total, value) => total + (value ?? 0), 0);
-}
-
-function percent(value: number) {
-  return `${Math.round(value * 100)}%`;
 }
 
 function round1(value: number) {
@@ -939,32 +877,6 @@ function daysBetweenActivities(left: Activity, right: Activity) {
   return Math.abs(new Date(right.startDate).getTime() - new Date(left.startDate).getTime()) / millisecondsPerDay;
 }
 
-function hoursBetween(left: Activity, right: Activity) {
-  return (new Date(left.startDate).getTime() - new Date(right.startDate).getTime()) / (60 * 60 * 1000);
-}
-
 function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
-}
-
-function activityEvidence(activity: Activity) {
-  return {
-    id: activity.providerActivityId,
-    name: activity.name,
-    startDate: activity.startDate,
-    distanceMiles: round1(miles(activity.distanceMeters)),
-    averagePaceSecondsPerKm: activity.averagePaceSecondsPerKm,
-    averageHeartRate: activity.averageHeartRate,
-    relativeEffort: activity.relativeEffort,
-    perceivedEffort: activity.perceivedEffort,
-    elevationGainMeters: activity.elevationGainMeters
-  };
-}
-
-function hardRunEvidence(classification: HardRunClassification) {
-  return {
-    ...activityEvidence(classification.activity),
-    reasons: classification.reasons,
-    classificationEvidence: classification.evidence
-  };
 }

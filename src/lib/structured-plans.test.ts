@@ -87,3 +87,16 @@ test("snapshot exposes calendar anchored plan start", () => {
   assert.equal(snapshot?.currentWeek, 1);
   assert.equal(snapshot?.currentDay, "monday");
 });
+
+test("snapshot uses supplied local date for plannedToday", () => {
+  const snapshot = structuredPlanSnapshot({
+    ...importedPlanFixture,
+    startDate: "2026-06-01",
+    currentWeek: undefined,
+    currentDay: undefined
+  }, { localDate: "2026-06-10" });
+
+  assert.equal(snapshot?.currentWeek, 2);
+  assert.equal(snapshot?.currentDay, "wednesday");
+  assert.equal(snapshot?.plannedToday?.type, "easy");
+});

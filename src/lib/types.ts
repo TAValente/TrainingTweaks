@@ -15,6 +15,9 @@ export type Activity = {
   perceivedEffort?: number;
   relativeEffort?: number;
   bestEfforts?: BestEffort[];
+  streamSync?: ActivityStreamSyncMetadata;
+  streams?: ActivityStreams;
+  streamSummary?: ActivityStreamSummary;
 };
 
 export type BestEffort = {
@@ -24,6 +27,55 @@ export type BestEffort = {
   elapsedTimeSeconds?: number;
   startDate?: string;
 };
+
+export type ActivityStreamSummary = {
+  source: "strava_streams";
+  fetchedAt: string;
+  availableTypes: StravaStreamType[];
+  sampleCount?: number;
+  movingSeconds?: number;
+  fastRunningSeconds?: number;
+  fastRunningSource?: "personalized_stream_zone";
+  fastRunningConfidence?: RiskConfidence;
+  downhillMeters?: number;
+  sharpPaceChangeCount?: number;
+};
+
+export type ActivityStreamSyncStatus = "not_attempted" | "fetched" | "failed" | "unavailable" | "rate_limited";
+
+export type ActivityStreamSyncMetadata = {
+  status: ActivityStreamSyncStatus;
+  mode: "full" | "selective" | "off";
+  attemptedAt?: string;
+  fetchedAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+  unavailableReason?: string;
+  streamTypes?: StravaStreamType[];
+};
+
+export type ActivityStreams = Partial<Record<StravaStreamType, ActivityStream>>;
+
+export type ActivityStream = {
+  type: StravaStreamType;
+  data: Array<number | boolean | [number, number]>;
+  seriesType?: string;
+  originalSize?: number;
+  resolution?: string;
+};
+
+export type StravaStreamType =
+  | "time"
+  | "distance"
+  | "latlng"
+  | "altitude"
+  | "velocity_smooth"
+  | "heartrate"
+  | "cadence"
+  | "watts"
+  | "temp"
+  | "moving"
+  | "grade_smooth";
 
 export type StravaTokenSet = {
   accessToken: string;
@@ -171,12 +223,12 @@ export type StructuredTrainingPlan = {
 };
 
 export type RiskCategory =
-  | "load"
-  | "long_run"
-  | "intensity"
-  | "recovery"
+  | "capacity"
+  | "adaptation"
+  | "cardio_load"
+  | "mechanical_exposure"
   | "novelty"
-  | "consistency"
+  | "decision_risk"
   | "data_quality";
 
 export type RiskSeverity = "info" | "green" | "yellow" | "red";
@@ -197,6 +249,107 @@ export type RiskFinding = {
   lookbackDays: number;
   evidence: Record<string, unknown>;
   createdAt: string;
+  framework?: {
+    capacity?: CapacityContext;
+    adaptation?: AdaptationContext;
+    cardioLoad?: CardioLoad;
+    mechanicalExposure?: MechanicalExposure;
+    noveltySignals?: NoveltySignal[];
+    decisionRisk?: DecisionRiskContext;
+  };
+};
+
+export type SignalSource =
+  | "strava_activity"
+  | "strava_effort"
+  | "strava_streams"
+  | "trainingtweaks_inferred"
+  | "manual"
+  | "unknown";
+
+export type CapacityContext = {
+  source: SignalSource;
+  confidence: RiskConfidence;
+  historicalPeakWeeklyMileage?: number;
+  historicalLongRunMiles?: number;
+  durableMileagePerWeek?: number;
+  runCountLast182Days?: number;
+  runCountLast730Days?: number;
+  runCountLast1825Days?: number;
+  fastestEfforts?: FastestEffortSummary[];
+  classification: "low" | "moderate" | "high" | "unknown";
+};
+
+export type AdaptationContext = {
+  source: SignalSource;
+  confidence: RiskConfidence;
+  mileage7Days: number;
+  mileage28Days: number;
+  mileage42Days: number;
+  mileagePerWeek28Days: number;
+  mileagePerWeek42Days: number;
+  longRun28DaysMiles: number;
+  runCount28Days: number;
+  cardioLoad28Days?: number;
+  fastRunningSeconds28Days?: number;
+  elevationGain28DaysMeters?: number;
+  hardSessions7Days: number;
+  classification: "low" | "moderate" | "high" | "unknown";
+};
+
+export type CardioLoad = {
+  cardioLoadScore?: number;
+  cardioLoadSource: "strava" | "internal" | "manual" | "unknown";
+  cardioLoadConfidence: RiskConfidence;
+  windowDays: number;
+};
+
+export type MechanicalExposure = {
+  source: SignalSource;
+  confidence: RiskConfidence;
+  windowDays: number;
+  distanceMiles: number;
+  durationSeconds: number;
+  longestRunMiles: number;
+  fastRunningSeconds?: number;
+  fastRunningSource: "streams" | "activity_summary_fallback" | "mixed" | "unavailable";
+  elevationGainMeters?: number;
+  downhillMeters?: number;
+};
+
+export type NoveltySignal = {
+  id: string;
+  label: string;
+  exposureType: "mileage" | "duration" | "long_run" | "cardio_load" | "fast_running" | "elevation" | "hard_day_clustering" | "run_frequency";
+  severity: RiskSeverity;
+  confidence: RiskConfidence;
+  currentValue: number;
+  baselineValue: number;
+  absoluteChange: number;
+  relativeRatio?: number;
+  unit: string;
+  source: SignalSource;
+  message: string;
+};
+
+export type DecisionRiskContext = {
+  scope: "observed" | "planned" | "planned_vs_observed";
+  observedWindowDays: number;
+  plannedWorkoutAvailable: boolean;
+  plannedWorkout?: PlannedWorkoutExposure;
+  painFatigueInjuryFlagsAvailable: boolean;
+  recommendationUse: "llm_context";
+};
+
+export type PlannedWorkoutExposure = {
+  source: "trainingtweaks_generated_plan" | "imported_plan" | "manual_plan" | "integration" | "unknown";
+  date?: string;
+  type?: TrainingPlanWorkoutType;
+  targetMiles?: number;
+  durationMinutes?: number;
+  intensity?: TrainingPlanWorkout["intensity"];
+  purpose?: string;
+  confidence: RiskConfidence;
 };
 
 export type RiskRuleThresholds = {
@@ -221,16 +374,13 @@ export type RiskRuleConfig = {
 export type RiskEngineConfig = {
   version: string;
   rules: {
-    weeklyVolumeGrowth: RiskRuleConfig;
-    acwrMileage: RiskRuleConfig;
-    consecutiveBuildWeeks: RiskRuleConfig;
-    longRunPercentage: RiskRuleConfig;
-    longRunJump: RiskRuleConfig;
-    hardSessionCount: RiskRuleConfig;
-    intensitySpike: RiskRuleConfig;
-    hardDayClustering: RiskRuleConfig;
-    consecutiveRunningDays: RiskRuleConfig;
-    trainingNovelty: RiskRuleConfig;
+    capacityContext: RiskRuleConfig;
+    adaptationContext: RiskRuleConfig;
+    cardioLoad: RiskRuleConfig;
+    mechanicalExposure: RiskRuleConfig;
+    novelty: RiskRuleConfig;
+    decisionRisk: RiskRuleConfig;
+    plannedVsObservedDecisionRisk: RiskRuleConfig;
     dataQuality: RiskRuleConfig;
   };
   hardRunClassification: RiskRuleConfig & {

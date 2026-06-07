@@ -1,152 +1,229 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { computeRiskFindings } from "./risk.ts";
-import type { Activity, RiskFinding } from "./types.ts";
+import type { Activity, ActivityStreamSummary, NoveltySignal, PlannedWorkoutExposure, RiskFinding } from "./types.ts";
 
 const asOfDate = new Date("2026-06-05T12:00:00.000Z");
 const dayMs = 24 * 60 * 60 * 1000;
 const metersPerMile = 1609.344;
 
-test("safe steady runner emits no elevated risk findings", () => {
-  const findings = computeRiskFindings({ activities: steadyRunner(), asOfDate });
-  assert.equal(elevated(findings).length, 0);
+test("near-zero fast-running baseline does not collapse novelty to zero", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [4, 4, 4], withEasyData()),
+      run(1, 5, {
+        ...withEasyData(),
+        streamSummary: streamSummary({ fastRunningSeconds: 180 })
+      })
+    ],
+    asOfDate
+  });
+  const signal = noveltySignal(assertFinding(findings, "fast_running_novelty"));
+  assert.equal(signal.baselineValue, 0);
+  assert.equal(signal.currentValue, 180);
+  assert.equal(signal.severity, "yellow");
 });
 
-test("weekly volume growth and ACWR fire on mileage jump", () => {
-  const findings = computeRiskFindings({ activities: mileageJumpRunner(), asOfDate });
-  assertFinding(findings, "weekly_volume_growth", "red");
-  assertFinding(findings, "acwr_mileage", "red");
+test("returning runner can have high capacity and low adaptation", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...oldHighCapacityBlock(),
+      run(1, 5, withEasyData())
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "adaptation_context");
+  assert.equal(finding.framework?.capacity?.classification, "high");
+  assert.equal(finding.framework?.adaptation?.classification, "low");
+  assert.equal(finding.severity, "yellow");
 });
 
-test("long-run-heavy runner fires long run percentage and jump", () => {
-  const findings = computeRiskFindings({ activities: longRunHeavyRunner(), asOfDate });
-  assertFinding(findings, "long_run_percentage", "red");
-  assertFinding(findings, "long_run_jump", "red");
+test("true beginner has low capacity and low adaptation", () => {
+  const findings = computeRiskFindings({
+    activities: [run(1, 3, withEasyData()), run(5, 3, withEasyData())],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "adaptation_context");
+  assert.equal(finding.framework?.capacity?.classification, "low");
+  assert.equal(finding.framework?.adaptation?.classification, "low");
 });
 
-test("hard day clustering runner fires hard count, intensity spike, and clustering", () => {
-  const findings = computeRiskFindings({ activities: hardClusterRunner(), asOfDate });
-  assertFinding(findings, "hard_session_count", "red");
-  assertFinding(findings, "intensity_spike", "red");
-  assertFinding(findings, "hard_day_clustering", "red");
+test("high cardio load can be novel while mechanical exposure stays ordinary", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [3, 3, 3], { ...withEasyData(), relativeEffort: 15 }),
+      run(1, 3, { ...withEasyData(), relativeEffort: 90 })
+    ],
+    asOfDate
+  });
+  assert.equal(assertFinding(findings, "cardio_load_novelty").severity, "red");
+  assert.equal(assertFinding(findings, "mileage_novelty").severity, "green");
 });
 
-test("consecutive running days emits elevated streak finding", () => {
-  const findings = computeRiskFindings({ activities: runningStreakRunner(), asOfDate });
-  assertFinding(findings, "consecutive_running_days", "red");
+test("mechanical novelty can be high even when cardio load is moderate", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [4, 4, 4], { ...withEasyData(), relativeEffort: 15 }),
+      run(1, 14, { ...withEasyData(), relativeEffort: 20 })
+    ],
+    asOfDate
+  });
+  assert.equal(assertFinding(findings, "long_run_novelty").severity, "red");
+  assert.equal(assertFinding(findings, "cardio_load_novelty").severity, "green");
 });
 
-test("new runner with insufficient history emits data quality finding", () => {
-  const findings = computeRiskFindings({ activities: [run(1, 4)], asOfDate });
-  const finding = assertFinding(findings, "data_quality", "info");
-  assert.equal(finding.title, "Limited running history");
+test("stream fast-running exposure identifies workout despite slow average pace", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [5, 5, 5], withEasyData()),
+      run(1, 6, {
+        ...withEasyData(),
+        averagePaceSecondsPerKm: 390,
+        streamSummary: streamSummary({ fastRunningSeconds: 600 })
+      })
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "fast_running_novelty");
+  const signal = noveltySignal(finding);
+  assert.equal(signal.source, "strava_streams");
+  assert.equal(finding.framework?.mechanicalExposure?.fastRunningSource, "streams");
+  assert.equal(signal.currentValue, 600);
 });
 
-test("runner with no HR, effort, or gear emits data quality findings", () => {
-  const findings = computeRiskFindings({ activities: paceOnlyRunner(), asOfDate });
-  assert(findings.some((finding) => finding.evidence.field === "averageHeartRate"));
-  assert(findings.some((finding) => finding.evidence.field === "relativeEffort"));
-  assert(findings.some((finding) => finding.evidence.field === "gearId"));
+test("no streams available uses low-confidence fallback instead of fake precision", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [5, 5, 5], withEasyData()),
+      run(1, 6, {
+        ...withEasyData(),
+        name: "Tempo workout",
+        averagePaceSecondsPerKm: 390
+      })
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "fast_running_novelty");
+  const signal = noveltySignal(finding);
+  assert.equal(signal.source, "trainingtweaks_inferred");
+  assert.equal(signal.confidence, "low");
+  assert.equal(finding.framework?.mechanicalExposure?.fastRunningSource, "activity_summary_fallback");
 });
 
-test("elevation spike contributes to training novelty", () => {
-  const findings = computeRiskFindings({ activities: elevationSpikeRunner(), asOfDate });
-  const finding = assertFinding(findings, "training_novelty", "yellow");
-  assert.equal((finding.evidence.components as Record<string, { score: number }>).elevationGain.score, 2);
+test("no planned workout emits only observed decision risk", () => {
+  const findings = computeRiskFindings({
+    activities: priorWeeks(6, [4, 4, 4], withEasyData()),
+    asOfDate
+  });
+  assertFinding(findings, "decision_risk_observed");
+  assert.equal(findings.some((finding) => finding.ruleId === "decision_risk_planned_vs_observed"), false);
 });
 
-test("consecutive build weeks emit build-streak finding", () => {
-  const findings = computeRiskFindings({ activities: buildWeekRunner(), asOfDate });
-  const finding = assertFinding(findings, "consecutive_build_weeks", "red");
-  assert.equal(finding.observedValue, 6);
+test("planned long run is compared against recent observed adaptation", () => {
+  const plannedWorkout: PlannedWorkoutExposure = {
+    source: "trainingtweaks_generated_plan",
+    type: "long_run",
+    targetMiles: 14,
+    intensity: "easy",
+    purpose: "Long run",
+    confidence: "medium"
+  };
+  const findings = computeRiskFindings({
+    activities: priorWeeks(6, [4, 4, 4], withEasyData()),
+    asOfDate,
+    plannedWorkout
+  });
+  const observed = assertFinding(findings, "decision_risk_observed");
+  const finding = assertFinding(findings, "decision_risk_planned_vs_observed");
+  assert.equal(finding.severity, "red");
+  assert.equal(observed.framework?.decisionRisk?.scope, "observed");
+  assert.equal(finding.framework?.decisionRisk?.scope, "observed");
+  assert.equal((finding.evidence.plannedDecisionRisk as { scope?: string; plannedWorkout?: PlannedWorkoutExposure }).scope, "planned_vs_observed");
+  assert.equal((finding.evidence.plannedDecisionRisk as { scope?: string; plannedWorkout?: PlannedWorkoutExposure }).plannedWorkout?.targetMiles, 14);
 });
 
-function elevated(findings: RiskFinding[]) {
-  return findings.filter((finding) => finding.severity === "yellow" || finding.severity === "red");
-}
+test("mixed stream and no-stream window keeps inferred hard exposure for unsynced runs", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [5, 5, 5], withEasyData()),
+      run(1, 5, {
+        ...withEasyData(),
+        streamSummary: streamSummary({ fastRunningSeconds: 300 })
+      }),
+      run(2, 5, {
+        ...withEasyData(),
+        name: "Tempo workout"
+      })
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "fast_running_novelty");
+  const signal = noveltySignal(finding);
+  assert.equal(finding.framework?.mechanicalExposure?.fastRunningSource, "mixed");
+  assert.equal(signal.currentValue, 1500);
+  assert.equal(signal.source, "trainingtweaks_inferred");
+});
 
-function assertFinding(findings: RiskFinding[], ruleId: string, severity: RiskFinding["severity"]) {
-  const finding = findings.find((candidate) => candidate.ruleId === ruleId && candidate.severity === severity);
-  assert.ok(finding, `Expected ${ruleId} ${severity}; got ${findings.map((item) => `${item.ruleId}:${item.severity}`).join(", ")}`);
+test("capacity includes best-effort summaries when available", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      run(365, 6, {
+        ...withEasyData(),
+        name: "5K race",
+        bestEfforts: [bestEffort("5K", 5000, 20 * 60)]
+      }),
+      run(1, 3, withEasyData())
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "capacity_context");
+  assert.equal(finding.framework?.capacity?.fastestEfforts?.[0]?.distance, "5K");
+  assert.equal(finding.framework?.capacity?.fastestEfforts?.[0]?.seconds, 1200);
+  assert.equal(finding.framework?.capacity?.confidence, "low");
+});
+
+test("strong old best effort can raise capacity while adaptation stays low", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      run(365, 6, {
+        ...withEasyData(),
+        name: "5K race",
+        bestEfforts: [bestEffort("5K", 5000, 20 * 60)]
+      }),
+      run(1, 3, withEasyData())
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "adaptation_context");
+  assert.equal(finding.framework?.capacity?.classification, "high");
+  assert.equal(finding.framework?.adaptation?.classification, "low");
+  assert.equal(finding.framework?.adaptation?.mileagePerWeek28Days, 0.8);
+});
+
+function assertFinding(findings: RiskFinding[], ruleId: string) {
+  const finding = findings.find((candidate) => candidate.ruleId === ruleId);
+  assert.ok(finding, `Expected ${ruleId}; got ${findings.map((item) => `${item.ruleId}:${item.severity}`).join(", ")}`);
   assert.equal(typeof finding.message, "string");
   assert.ok(Object.keys(finding.evidence).length > 0);
   return finding;
 }
 
-function steadyRunner() {
+function noveltySignal(finding: RiskFinding) {
+  return finding.evidence.noveltySignal as NoveltySignal;
+}
+
+function oldHighCapacityBlock() {
   const activities: Activity[] = [];
-  for (let week = 0; week < 10; week += 1) {
+  for (let week = 16; week < 24; week += 1) {
     const base = week * 7;
     activities.push(
-      run(base + 1, 7, { averageHeartRate: 138, averagePaceSecondsPerKm: 330, relativeEffort: 20 }),
-      run(base + 3, 6, { averageHeartRate: 136, averagePaceSecondsPerKm: 335, relativeEffort: 18 }),
-      run(base + 5, 6, { averageHeartRate: 137, averagePaceSecondsPerKm: 333, relativeEffort: 19 }),
-      run(base + 6, 6, { averageHeartRate: 139, averagePaceSecondsPerKm: 332, relativeEffort: 20 })
+      run(base + 1, 10, withEasyData()),
+      run(base + 3, 10, withEasyData()),
+      run(base + 5, 10, withEasyData()),
+      run(base + 6, 10, withEasyData())
     );
   }
   return activities;
-}
-
-function mileageJumpRunner() {
-  return [
-    ...priorWeeks(4, [5, 5, 5, 5]),
-    run(1, 6, withEasyData()),
-    run(2, 6, withEasyData()),
-    run(3, 6, withEasyData()),
-    run(4, 6, withEasyData()),
-    run(5, 6, withEasyData())
-  ];
-}
-
-function longRunHeavyRunner() {
-  return [
-    ...priorWeeks(4, [4, 4, 8]),
-    run(1, 14, withEasyData()),
-    run(3, 4, withEasyData()),
-    run(5, 4, withEasyData())
-  ];
-}
-
-function hardClusterRunner() {
-  return [
-    ...priorWeeks(4, [5, 5, 5, 5], { relativeEffort: 10, averageHeartRate: 135, averagePaceSecondsPerKm: 340 }),
-    run(1, 5, { name: "Tempo workout", relativeEffort: 80, averageHeartRate: 166, averagePaceSecondsPerKm: 290 }),
-    run(2, 5, { name: "Interval workout", relativeEffort: 80, averageHeartRate: 168, averagePaceSecondsPerKm: 285 }),
-    run(3, 11, { name: "Long run", relativeEffort: 28, averageHeartRate: 142, averagePaceSecondsPerKm: 335 }),
-    run(4, 5, { name: "Threshold workout", relativeEffort: 80, averageHeartRate: 167, averagePaceSecondsPerKm: 288 })
-  ];
-}
-
-function runningStreakRunner() {
-  return [
-    ...priorWeeks(4, [4, 4, 4, 4], withEasyData()),
-    ...[0, 1, 2, 3, 4, 5, 6].map((daysAgo) => run(daysAgo, 3, withEasyData()))
-  ];
-}
-
-function paceOnlyRunner() {
-  return [1, 3, 5, 8, 10, 12, 15, 17].map((daysAgo) => run(daysAgo, 4, { averagePaceSecondsPerKm: 330 }));
-}
-
-function elevationSpikeRunner() {
-  return [
-    ...priorWeeks(8, [5, 5, 5, 5], { ...withEasyData(), elevationGainMeters: 20 }),
-    run(1, 5, { ...withEasyData(), elevationGainMeters: 220 }),
-    run(3, 5, { ...withEasyData(), elevationGainMeters: 220 }),
-    run(5, 5, { ...withEasyData(), elevationGainMeters: 220 }),
-    run(6, 5, { ...withEasyData(), elevationGainMeters: 220 })
-  ];
-}
-
-function buildWeekRunner() {
-  const weeklyMileage = [10, 12, 14, 16, 18, 20, 22];
-  return weeklyMileage.flatMap((mileage, index) => {
-    const weekOffset = (weeklyMileage.length - index - 1) * 7;
-    return [
-      run(weekOffset + 2, mileage / 2, withEasyData()),
-      run(weekOffset + 5, mileage / 2, withEasyData())
-    ];
-  });
 }
 
 function priorWeeks(weeks: number, distances: number[], overrides: Partial<Activity> = withEasyData()) {
@@ -162,7 +239,7 @@ function priorWeeks(weeks: number, distances: number[], overrides: Partial<Activ
 function run(daysAgo: number, distanceMiles: number, overrides: Partial<Activity> = {}): Activity {
   return {
     provider: "strava",
-    providerActivityId: `run-${daysAgo}-${distanceMiles}-${overrides.name ?? "easy"}`,
+    providerActivityId: `run-${daysAgo}-${distanceMiles}-${overrides.name ?? "easy"}-${overrides.relativeEffort ?? ""}-${overrides.streamSummary?.fastRunningSeconds ?? ""}`,
     sportType: "Run",
     name: overrides.name ?? "Easy run",
     startDate: new Date(asOfDate.getTime() - daysAgo * dayMs).toISOString(),
@@ -179,5 +256,28 @@ function withEasyData(): Partial<Activity> {
     averageHeartRate: 138,
     averagePaceSecondsPerKm: 335,
     relativeEffort: 20
+  };
+}
+
+function streamSummary(input: { fastRunningSeconds: number }): ActivityStreamSummary {
+  return {
+    source: "strava_streams" as const,
+    fetchedAt: asOfDate.toISOString(),
+    availableTypes: ["time", "distance", "velocity_smooth", "moving"],
+    sampleCount: 100,
+    movingSeconds: 1800,
+    fastRunningSeconds: input.fastRunningSeconds,
+    fastRunningSource: "personalized_stream_zone" as const,
+    fastRunningConfidence: "medium" as const
+  };
+}
+
+function bestEffort(name: string, distanceMeters: number, elapsedTimeSeconds: number) {
+  return {
+    name,
+    distanceMeters,
+    elapsedTimeSeconds,
+    movingTimeSeconds: elapsedTimeSeconds,
+    startDate: asOfDate.toISOString()
   };
 }
