@@ -125,6 +125,8 @@ Structured plan data is stored inside the existing per-user app state JSON. The 
 
 TrainingTweaks also includes a deterministic generic marathon scaffold generated from current miles per week, target or max miles per week, plan length, and low/regular/high risk tolerance. Risk tolerance is parameterized as a planned-risk budget: low allows no scheduled yellow or red findings, regular allows limited yellow findings and no red findings, and high allows more yellow findings with a small red allowance. The starter marathon generator only schedules recovery runs, workout placeholders, and long runs for now; workout details are intentionally left to be chosen later.
 
+The Plan tab lets a runner generate a starter plan, anchor it to a real calendar start date, and review each week with expected load, intensity, durability, and day-by-day workouts.
+
 This keeps the app ready for plan-aware projections while avoiding app-shipped copies of popular published programs. The intended third-party path is bring-your-own-plan import, while TrainingTweaks-authored generic plans can be designed collaboratively inside the product.
 
 Use the Supabase session pooler connection string if your network or deploy target does not support direct IPv6 database connections.

@@ -7,12 +7,14 @@ test("builds a deterministic generic marathon plan from mileage inputs", () => {
     currentMilesPerWeek: 20,
     targetMilesPerWeek: 45,
     durationWeeks: 16,
-    riskTolerance: "regular"
+    riskTolerance: "regular",
+    startDate: "2026-06-08"
   });
 
   assert.equal(plan.schemaVersion, "1");
   assert.equal(plan.source, "trainingtweaks_generic");
   assert.equal(plan.raceDistance, "marathon");
+  assert.equal(plan.startDate, "2026-06-08");
   assert.equal(plan.durationWeeks, 16);
   assert.equal(plan.weeks.length, 16);
   assert.equal(plan.weeks.at(-1)?.focus, "Race week");

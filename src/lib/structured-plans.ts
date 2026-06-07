@@ -2,8 +2,9 @@ import type { StructuredTrainingPlan, TrainingPlanDayOfWeek } from "./types";
 
 export function structuredPlanSnapshot(plan?: StructuredTrainingPlan) {
   if (!plan) return undefined;
-  const currentWeek = clampWeek(plan.currentWeek ?? 1, plan.durationWeeks);
-  const currentDay = plan.currentDay ?? "monday";
+  const calendarPosition = calendarPlanPosition(plan);
+  const currentWeek = clampWeek(calendarPosition?.weekNumber ?? plan.currentWeek ?? 1, plan.durationWeeks);
+  const currentDay = calendarPosition?.dayOfWeek ?? plan.currentDay ?? "monday";
   const week = plan.weeks.find((candidate) => candidate.weekNumber === currentWeek);
   const today = week?.days.find((day) => day.dayOfWeek === currentDay);
   const upcoming = upcomingDays(plan, currentWeek, currentDay, 7);
@@ -12,6 +13,7 @@ export function structuredPlanSnapshot(plan?: StructuredTrainingPlan) {
     name: plan.name,
     source: plan.source,
     raceDistance: plan.raceDistance,
+    startDate: plan.startDate,
     durationWeeks: plan.durationWeeks,
     currentWeek,
     currentDay,
@@ -61,4 +63,30 @@ function upcomingDays(
 function clampWeek(value: number, durationWeeks: number) {
   if (!Number.isFinite(value)) return 1;
   return Math.min(durationWeeks, Math.max(1, Math.round(value)));
+}
+
+function calendarPlanPosition(plan: StructuredTrainingPlan) {
+  if (!plan.startDate) return undefined;
+  const start = parseIsoDate(plan.startDate);
+  if (!start) return undefined;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deltaDays = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  if (deltaDays < 0) return { weekNumber: 1, dayOfWeek: "monday" as TrainingPlanDayOfWeek };
+  return {
+    weekNumber: clampWeek(Math.floor(deltaDays / 7) + 1, plan.durationWeeks),
+    dayOfWeek: dayOfWeekFromIndex(deltaDays % 7)
+  };
+}
+
+function parseIsoDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return undefined;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function dayOfWeekFromIndex(index: number): TrainingPlanDayOfWeek {
+  return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"][index] as TrainingPlanDayOfWeek;
 }
