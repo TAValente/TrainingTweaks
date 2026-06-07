@@ -312,7 +312,7 @@ export type MechanicalExposure = {
   durationSeconds: number;
   longestRunMiles: number;
   fastRunningSeconds?: number;
-  fastRunningSource: "streams" | "activity_summary_fallback" | "unavailable";
+  fastRunningSource: "streams" | "activity_summary_fallback" | "mixed" | "unavailable";
   elevationGainMeters?: number;
   downhillMeters?: number;
 };
@@ -374,16 +374,13 @@ export type RiskRuleConfig = {
 export type RiskEngineConfig = {
   version: string;
   rules: {
-    weeklyVolumeGrowth: RiskRuleConfig;
-    acwrMileage: RiskRuleConfig;
-    consecutiveBuildWeeks: RiskRuleConfig;
-    longRunPercentage: RiskRuleConfig;
-    longRunJump: RiskRuleConfig;
-    hardSessionCount: RiskRuleConfig;
-    intensitySpike: RiskRuleConfig;
-    hardDayClustering: RiskRuleConfig;
-    consecutiveRunningDays: RiskRuleConfig;
-    trainingNovelty: RiskRuleConfig;
+    capacityContext: RiskRuleConfig;
+    adaptationContext: RiskRuleConfig;
+    cardioLoad: RiskRuleConfig;
+    mechanicalExposure: RiskRuleConfig;
+    novelty: RiskRuleConfig;
+    decisionRisk: RiskRuleConfig;
+    plannedVsObservedDecisionRisk: RiskRuleConfig;
     dataQuality: RiskRuleConfig;
   };
   hardRunClassification: RiskRuleConfig & {

@@ -18,19 +18,24 @@ import type {
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const metersPerMile = 1609.344;
 
+const capacityBestEffortTargets = [
+  { distance: "1 mile" as const, meters: 1609.344, highSeconds: 6.5 * 60, moderateSeconds: 8.5 * 60 },
+  { distance: "5K" as const, meters: 5000, highSeconds: 22 * 60, moderateSeconds: 28 * 60 },
+  { distance: "10K" as const, meters: 10000, highSeconds: 45 * 60, moderateSeconds: 58 * 60 },
+  { distance: "Half marathon" as const, meters: 21097.5, highSeconds: 105 * 60, moderateSeconds: 130 * 60 },
+  { distance: "Marathon" as const, meters: 42195, highSeconds: 225 * 60, moderateSeconds: 285 * 60 }
+];
+
 export const defaultRiskConfig: RiskEngineConfig = {
   version: "load-risk-framework-v1",
   rules: {
-    weeklyVolumeGrowth: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
-    acwrMileage: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
-    consecutiveBuildWeeks: frameworkRule(7, 42, { yellow: 4, red: 6 }, "medium"),
-    longRunPercentage: frameworkRule(7, 42, { yellow: 1, red: 2 }, "high"),
-    longRunJump: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
-    hardSessionCount: frameworkRule(7, 42, { yellow: 2, red: 3 }, "medium"),
-    intensitySpike: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
-    hardDayClustering: frameworkRule(7, 42, { yellow: 1, red: 2 }, "high"),
-    consecutiveRunningDays: frameworkRule(14, 42, { yellow: 5, red: 7 }, "medium"),
-    trainingNovelty: frameworkRule(7, 42, { yellow: 1, red: 2 }, "exploratory"),
+    capacityContext: frameworkRule(1825, 0, { yellow: 1, red: 2 }, "medium"),
+    adaptationContext: frameworkRule(42, 0, { yellow: 1, red: 2 }, "medium"),
+    cardioLoad: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
+    mechanicalExposure: frameworkRule(7, 42, { yellow: 1, red: 2 }, "medium"),
+    novelty: frameworkRule(7, 42, { yellow: 1, red: 2 }, "exploratory"),
+    decisionRisk: frameworkRule(49, 0, { yellow: 1, red: 2 }, "medium"),
+    plannedVsObservedDecisionRisk: frameworkRule(49, 0, { yellow: 1, red: 2 }, "medium"),
     dataQuality: frameworkRule(56, 0, { yellow: 8, red: 3 }, "high")
   },
   hardRunClassification: {
@@ -253,7 +258,8 @@ function plannedVsObservedDecisionRiskFindings(context: FrameworkContext): RiskF
         plannedWorkout: planned,
         riskDrivers,
         adaptation: context.adaptation,
-        observedDecisionRisk: context.decisionRisk
+        observedDecisionRisk: context.decisionRisk,
+        plannedDecisionRisk: plannedDecisionRiskContext(planned)
       }
     })
   ];
@@ -314,10 +320,9 @@ function buildFrameworkContext(activities: Activity[], asOfDate: Date, config: R
     mechanical28,
     noveltySignals,
     decisionRisk: {
-      scope: plannedWorkout ? "planned_vs_observed" : "observed",
+      scope: "observed",
       observedWindowDays: 49,
-      plannedWorkoutAvailable: Boolean(plannedWorkout),
-      plannedWorkout,
+      plannedWorkoutAvailable: false,
       painFatigueInjuryFlagsAvailable: false,
       recommendationUse: "llm_context"
     },
@@ -332,25 +337,70 @@ function capacityContext(runs: Activity[], asOfDate: Date): CapacityContext {
   const peakWeekly = Math.max(0, ...weekBucketsForRuns(runs1825, asOfDate, 1825).map((bucket) => bucket.mileage));
   const longRun = miles(longestRun(runs1825)?.distanceMeters);
   const durableMileagePerWeek = mileage(runs182) / 26;
-  const classification = peakWeekly >= 35 || longRun >= 14 || runs730.length >= 180
+  const fastestEfforts = capacityFastestEfforts(runs1825);
+  const bestEffortClass = capacityClassFromBestEfforts(fastestEfforts);
+  const activityClass = peakWeekly >= 35 || longRun >= 14 || runs730.length >= 180
     ? "high"
     : peakWeekly >= 15 || longRun >= 8 || runs182.length >= 40
       ? "moderate"
       : runs1825.length
         ? "low"
         : "unknown";
+  const classification = strongerCapacityClass(activityClass, bestEffortClass);
   return {
     source: "strava_activity",
-    confidence: runs1825.length >= 20 ? "medium" : "low",
+    confidence: runs1825.length >= 20 || fastestEfforts.length ? "medium" : "low",
     historicalPeakWeeklyMileage: round1(peakWeekly),
     historicalLongRunMiles: round1(longRun),
     durableMileagePerWeek: round1(durableMileagePerWeek),
     runCountLast182Days: runs182.length,
     runCountLast730Days: runs730.length,
     runCountLast1825Days: runs1825.length,
-    fastestEfforts: [],
+    fastestEfforts,
     classification
   };
+}
+
+function capacityFastestEfforts(runs: Activity[]) {
+  return capacityBestEffortTargets.flatMap((target) => {
+    const best = runs
+      .flatMap((activity) =>
+        (activity.bestEfforts ?? [])
+          .filter((effort) => Math.abs(effort.distanceMeters - target.meters) / target.meters <= 0.08)
+          .map((effort) => ({ activity, effort }))
+      )
+      .filter(({ effort }) => effort.elapsedTimeSeconds || effort.movingTimeSeconds)
+      .sort((left, right) =>
+        (left.effort.elapsedTimeSeconds ?? left.effort.movingTimeSeconds ?? Infinity) -
+        (right.effort.elapsedTimeSeconds ?? right.effort.movingTimeSeconds ?? Infinity)
+      )[0];
+    if (!best) return [];
+    const seconds = best.effort.elapsedTimeSeconds ?? best.effort.movingTimeSeconds ?? 0;
+    return [{
+      period: "5 years" as const,
+      distance: target.distance,
+      seconds,
+      paceSecondsPerMile: seconds / (target.meters / metersPerMile),
+      activityName: best.activity.name,
+      activityDate: best.activity.startDate.slice(0, 10)
+    }];
+  }).slice(0, 5);
+}
+
+function capacityClassFromBestEfforts(efforts: ReturnType<typeof capacityFastestEfforts>) {
+  let best: CapacityContext["classification"] = "unknown";
+  for (const effort of efforts) {
+    const target = capacityBestEffortTargets.find((candidate) => candidate.distance === effort.distance);
+    if (!target) continue;
+    if (effort.seconds <= target.highSeconds) return "high";
+    if (effort.seconds <= target.moderateSeconds) best = strongerCapacityClass(best, "moderate");
+  }
+  return best;
+}
+
+function strongerCapacityClass(left: CapacityContext["classification"], right: CapacityContext["classification"]) {
+  const order: Record<CapacityContext["classification"], number> = { unknown: 0, low: 1, moderate: 2, high: 3 };
+  return order[right] > order[left] ? right : left;
 }
 
 function adaptationContext(
@@ -405,25 +455,43 @@ function cardioLoad(runs: Activity[], windowDays: number): CardioLoad {
 }
 
 function mechanicalExposure(runs: Activity[], hardRuns: HardRunClassification[], windowDays: number): MechanicalExposure {
-  const streamFastSeconds = sum(runs.map((run) => run.streamSummary?.fastRunningSeconds));
-  const hasStreams = runs.some((run) => run.streamSummary);
-  const fallbackHardSeconds = hasStreams
-    ? 0
-    : sum(runs.map((run) => {
-        const hardRun = hardRuns.find((candidate) => candidate.activity.providerActivityId === run.providerActivityId);
-        return hardRun?.isHard ? Math.min(run.movingTimeSeconds ?? 0, 20 * 60) : 0;
-      }));
+  const fastExposure = runs.map((run) => fastExposureForActivity(run, hardRuns));
+  const streamFastSeconds = sum(fastExposure.filter((item) => item.source === "streams").map((item) => item.seconds));
+  const fallbackHardSeconds = sum(fastExposure.filter((item) => item.source === "activity_summary_fallback").map((item) => item.seconds));
+  const hasStreamFastExposure = streamFastSeconds > 0;
+  const hasFallbackFastExposure = fallbackHardSeconds > 0;
+  const fastRunningSource = hasStreamFastExposure && hasFallbackFastExposure
+    ? "mixed"
+    : hasStreamFastExposure
+      ? "streams"
+      : hasFallbackFastExposure
+        ? "activity_summary_fallback"
+        : "unavailable";
   return {
-    source: hasStreams ? "strava_streams" : "strava_activity",
-    confidence: hasStreams ? "medium" : "low",
+    source: runs.some((run) => run.streamSummary) ? "strava_streams" : "strava_activity",
+    confidence: fastRunningSource === "streams" ? "medium" : "low",
     windowDays,
     distanceMiles: round1(mileage(runs)),
     durationSeconds: sum(runs.map((run) => run.movingTimeSeconds)),
     longestRunMiles: round1(miles(longestRun(runs)?.distanceMeters)),
-    fastRunningSeconds: hasStreams ? streamFastSeconds : fallbackHardSeconds || undefined,
-    fastRunningSource: hasStreams ? "streams" : fallbackHardSeconds ? "activity_summary_fallback" : "unavailable",
+    fastRunningSeconds: streamFastSeconds + fallbackHardSeconds || undefined,
+    fastRunningSource,
     elevationGainMeters: round1(sum(runs.map((run) => run.elevationGainMeters))),
     downhillMeters: round1(sum(runs.map((run) => run.streamSummary?.downhillMeters)))
+  };
+}
+
+function fastExposureForActivity(activity: Activity, hardRuns: HardRunClassification[]) {
+  if (activity.streamSummary) {
+    return {
+      source: "streams" as const,
+      seconds: activity.streamSummary.fastRunningSeconds ?? 0
+    };
+  }
+  const hardRun = hardRuns.find((candidate) => candidate.activity.providerActivityId === activity.providerActivityId);
+  return {
+    source: hardRun?.isHard ? "activity_summary_fallback" as const : "unavailable" as const,
+    seconds: hardRun?.isHard ? Math.min(activity.movingTimeSeconds ?? 0, 20 * 60) : 0
   };
 }
 
@@ -478,7 +546,7 @@ function noveltySignalsForContext(
       yellowRatio: 1.5,
       redRatio: 2,
       unit: "seconds",
-      source: mechanical7.fastRunningSource === "streams" ? "strava_streams" : mechanical7.fastRunningSource === "activity_summary_fallback" ? "trainingtweaks_inferred" : "unknown",
+      source: mechanical7.fastRunningSource === "streams" ? "strava_streams" : mechanical7.fastRunningSource === "unavailable" ? "unknown" : "trainingtweaks_inferred",
       confidence: mechanical7.fastRunningSource === "streams" ? "medium" : "low"
     }),
     novelty("elevation_novelty", "Elevation exposure novelty", "elevation", mechanical7.elevationGainMeters ?? 0, baselineElevation, {
@@ -598,6 +666,17 @@ function plannedRiskDrivers(context: FrameworkContext, planned: PlannedWorkoutEx
   }
 
   return drivers.filter((driver) => driver.severity === "yellow" || driver.severity === "red");
+}
+
+function plannedDecisionRiskContext(plannedWorkout: PlannedWorkoutExposure): DecisionRiskContext {
+  return {
+    scope: "planned_vs_observed",
+    observedWindowDays: 49,
+    plannedWorkoutAvailable: true,
+    plannedWorkout,
+    painFatigueInjuryFlagsAvailable: false,
+    recommendationUse: "llm_context"
+  };
 }
 
 function plannedDecisionRiskMessage(severity: RiskSeverity, planned: PlannedWorkoutExposure) {

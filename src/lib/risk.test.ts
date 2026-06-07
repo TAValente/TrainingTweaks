@@ -133,10 +133,69 @@ test("planned long run is compared against recent observed adaptation", () => {
     asOfDate,
     plannedWorkout
   });
+  const observed = assertFinding(findings, "decision_risk_observed");
   const finding = assertFinding(findings, "decision_risk_planned_vs_observed");
   assert.equal(finding.severity, "red");
-  assert.equal(finding.framework?.decisionRisk?.scope, "planned_vs_observed");
-  assert.equal(finding.framework?.decisionRisk?.plannedWorkout?.targetMiles, 14);
+  assert.equal(observed.framework?.decisionRisk?.scope, "observed");
+  assert.equal(finding.framework?.decisionRisk?.scope, "observed");
+  assert.equal((finding.evidence.plannedDecisionRisk as { scope?: string; plannedWorkout?: PlannedWorkoutExposure }).scope, "planned_vs_observed");
+  assert.equal((finding.evidence.plannedDecisionRisk as { scope?: string; plannedWorkout?: PlannedWorkoutExposure }).plannedWorkout?.targetMiles, 14);
+});
+
+test("mixed stream and no-stream window keeps inferred hard exposure for unsynced runs", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      ...priorWeeks(6, [5, 5, 5], withEasyData()),
+      run(1, 5, {
+        ...withEasyData(),
+        streamSummary: streamSummary({ fastRunningSeconds: 300 })
+      }),
+      run(2, 5, {
+        ...withEasyData(),
+        name: "Tempo workout"
+      })
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "fast_running_novelty");
+  const signal = noveltySignal(finding);
+  assert.equal(finding.framework?.mechanicalExposure?.fastRunningSource, "mixed");
+  assert.equal(signal.currentValue, 1500);
+  assert.equal(signal.source, "trainingtweaks_inferred");
+});
+
+test("capacity includes best-effort summaries when available", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      run(365, 6, {
+        ...withEasyData(),
+        name: "5K race",
+        bestEfforts: [bestEffort("5K", 5000, 20 * 60)]
+      }),
+      run(1, 3, withEasyData())
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "capacity_context");
+  assert.equal(finding.framework?.capacity?.fastestEfforts?.[0]?.distance, "5K");
+  assert.equal(finding.framework?.capacity?.fastestEfforts?.[0]?.seconds, 1200);
+});
+
+test("strong old best effort can raise capacity while adaptation stays low", () => {
+  const findings = computeRiskFindings({
+    activities: [
+      run(365, 6, {
+        ...withEasyData(),
+        name: "5K race",
+        bestEfforts: [bestEffort("5K", 5000, 20 * 60)]
+      }),
+      run(1, 3, withEasyData())
+    ],
+    asOfDate
+  });
+  const finding = assertFinding(findings, "adaptation_context");
+  assert.equal(finding.framework?.capacity?.classification, "high");
+  assert.equal(finding.framework?.adaptation?.classification, "low");
 });
 
 function assertFinding(findings: RiskFinding[], ruleId: string) {
@@ -208,5 +267,15 @@ function streamSummary(input: { fastRunningSeconds: number }): ActivityStreamSum
     fastRunningSeconds: input.fastRunningSeconds,
     fastRunningSource: "personalized_stream_zone" as const,
     fastRunningConfidence: "medium" as const
+  };
+}
+
+function bestEffort(name: string, distanceMeters: number, elapsedTimeSeconds: number) {
+  return {
+    name,
+    distanceMeters,
+    elapsedTimeSeconds,
+    movingTimeSeconds: elapsedTimeSeconds,
+    startDate: asOfDate.toISOString()
   };
 }

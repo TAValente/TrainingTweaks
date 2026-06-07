@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { activitiesForClient } from "@/lib/activity-serialization";
 import { authCookieName, getRequestUser } from "@/lib/auth";
 import {
   fetchDetailedRunActivities,
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     detailedRunRemainingThisBatch: detailSync.remainingCount,
     streamSync: streamSyncSummary,
     totalCount: activities.length,
-    activities: activities.slice(0, 20),
+    activities: activitiesForClient(activities.slice(0, 20)),
     summary: buildActivitySummary(activities),
     riskFindings: computeRiskFindings({ activities, plannedWorkout })
   });

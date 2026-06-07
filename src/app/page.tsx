@@ -1076,9 +1076,9 @@ function plannedWeekMetrics(plan: StructuredTrainingPlan, week: TrainingPlanWeek
   const workoutMiles = round1(workouts.reduce((total, day) => total + (day.workout.targetMiles ?? 0), 0));
   const longRunMiles = week.days.find((day) => day.workout.type === "long_run")?.workout.targetMiles ?? 0;
   const longRunShare = targetMiles ? round1((longRunMiles / targetMiles) * 100) : 0;
-  const load = assessment("weekly_volume_growth");
-  const intensity = assessment("hard_session_count");
-  const durability = assessment("long_run_percentage");
+  const load = assessment("planned_mileage_step");
+  const intensity = assessment("planned_quality_density");
+  const durability = assessment("planned_long_run_share");
 
   return [
     {

@@ -14,7 +14,7 @@ Scope:
 - mechanical exposure with source and confidence
 - novelty signals versus current adaptation
 - decision risk findings
-- selective Strava stream enrichment for recent/candidate runs
+- broad Strava stream sync for authenticated run history in the current single-user product
 - missing-context signals that reduce confidence
 
 Output structured risk signals for the judgment layer. The LLM should interpret these signals, not invent them from raw activity data.

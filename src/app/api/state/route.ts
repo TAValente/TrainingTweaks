@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { activitiesForClient } from "@/lib/activity-serialization";
 import { authCookieName, getRequestUser } from "@/lib/auth";
 import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       user,
       connected: Boolean(data.strava),
       lastRefreshAt: data.lastRefreshAt,
-      activities: data.activities.slice(0, 20),
+      activities: activitiesForClient(data.activities.slice(0, 20)),
       context: data.context,
       summary: buildActivitySummary(data.activities),
       riskFindings: computeRiskFindings({ activities: data.activities, plannedWorkout })
