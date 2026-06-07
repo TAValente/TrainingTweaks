@@ -32,27 +32,42 @@ Scope:
 
 The doctrine should help TrainingTweaks decide how convicted to be when the user's current impulse conflicts with their stated goals.
 
-## 3. Decision Memory
+## 3. Decision-Improvement Loop
 
-Persist decisions so recommendations can be evaluated after the fact.
+Treat TrainingTweaks as a system for improving decisions, not merely generating plans or detecting risks.
+
+The product should help runners establish a decision framework, apply it in real situations, observe what happened, and improve the framework over time.
+
+A recommendation is not complete until the system can later compare:
+
+- what was expected
+- what was recommended
+- what the runner did
+- what happened afterward
+- what should change next time
+
+Persist decisions so recommendations and decision frameworks can be evaluated after the fact.
 
 Scope:
 
 - question
 - context snapshot
+- expectation or forecast
 - risk signals
 - recommendation
+- decision framework or rule applied
 - priority/doctrine used
 - intended recommendation direction
 - actual behavior observed from Strava
 - user feedback when available
 - adherence classification: exact, partial, directionally aligned, ignored, unknown
 - outcome notes
+- suggested framework adjustment
 
 This creates the loop:
 
 ```text
-Decision -> Recommendation -> Actual Behavior -> Outcome
+Expected -> Recommended -> Did -> Outcome -> Adjust
 ```
 
 ## 4. Feedback and Annoyance Detection
