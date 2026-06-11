@@ -2,6 +2,14 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { generateTrainingPlan } from "@/lib/plan-generator";
+import {
+  acceptPreviewPlan,
+  discardPreviewPlan,
+  peakLongRunMiles,
+  previewGeneratedPlan,
+  weeklyPreviewRows,
+  type PlanPreviewState
+} from "@/lib/plan-preview";
 import { structuredPlanSummary } from "@/lib/structured-plans";
 import type {
   Activity,
@@ -114,6 +122,7 @@ export default function Home() {
   const [savedPlanVariant, setSavedPlanVariant] = useState("");
   const [savedPlanContext, setSavedPlanContext] = useState("");
   const [savedStructuredPlan, setSavedStructuredPlan] = useState<StructuredTrainingPlan | undefined>();
+  const [previewStructuredPlan, setPreviewStructuredPlan] = useState<StructuredTrainingPlan | undefined>();
   const [starterGoalType, setStarterGoalType] = useState<TrainingPlanGeneratorGoal>("half_marathon");
   const [starterDaysPerWeek, setStarterDaysPerWeek] = useState(4);
   const [starterTargetMileage, setStarterTargetMileage] = useState(40);
@@ -187,6 +196,7 @@ export default function Home() {
     setSavedPlanVariant(nextPlanVariant);
     setSavedPlanContext(nextPlanContext);
     setSavedStructuredPlan(nextState.context?.structuredPlan);
+    setPreviewStructuredPlan(undefined);
     setSavedGoalsContext(nextGoalsContext);
     setSubjectiveContext(nextState.context?.subjectiveContext ?? "");
     setStatus(nextState.connected ? "Strava connected." : "Connect Strava to refresh activities.");
@@ -324,7 +334,20 @@ export default function Home() {
       setStatus(result.warnings.join(" "));
       return;
     }
-    const structuredPlan = result.plan;
+    const previewState = previewGeneratedPlan(planPreviewState(), result.plan);
+    setPreviewStructuredPlan(previewState.previewStructuredPlan);
+    setError("");
+    setStatus(
+      result.warnings.length
+        ? `${statusText(result.status)} plan preview generated with warnings. ${result.warnings[0]}`
+        : `${statusText(result.status)} plan preview generated. Use this plan to make it active.`
+    );
+  }
+
+  function acceptPreview() {
+    const accepted = acceptPreviewPlan(planPreviewState());
+    const structuredPlan = accepted.activeStructuredPlan;
+    if (!structuredPlan) return;
     setState((current) => ({
       ...current,
       context: {
@@ -332,15 +355,30 @@ export default function Home() {
         structuredPlan
       }
     }));
+    setPreviewStructuredPlan(accepted.previewStructuredPlan);
     setPlanSource("custom");
     setPlanVariant(structuredPlan.name);
     setSelectedPlanPosition(structuredPlan, currentCalendarWeek(structuredPlan));
-    setError("");
-    setStatus(
-      result.warnings.length
-        ? `${statusText(result.status)} plan generated with warnings. ${result.warnings[0]}`
-        : `${statusText(result.status)} plan generated. Save plan context to persist it.`
-    );
+    setStatus("Preview plan is now active. Save plan context to persist it.");
+  }
+
+  function discardPreview() {
+    const discarded = discardPreviewPlan(planPreviewState());
+    setPreviewStructuredPlan(discarded.previewStructuredPlan);
+    setStatus("Plan preview discarded. Active plan is unchanged.");
+  }
+
+  function adjustPreviewSettings() {
+    setIsEditingPlan(true);
+    setPlanSetupMode("build");
+    setStatus("Adjust settings, then generate a new preview.");
+  }
+
+  function planPreviewState(): PlanPreviewState {
+    return {
+      activeStructuredPlan: state.context?.structuredPlan,
+      previewStructuredPlan
+    };
   }
 
   function setSelectedPlanPosition(plan: StructuredTrainingPlan | undefined, weekNumber: number, date = todayIsoDate()) {
@@ -662,8 +700,12 @@ export default function Home() {
                 }
               }));
               setSelectedPlanPosition(savedStructuredPlan, currentCalendarWeek(savedStructuredPlan));
+              setPreviewStructuredPlan(undefined);
               setIsEditingPlan(false);
             }}
+            onAcceptPreview={acceptPreview}
+            onAdjustPreview={adjustPreviewSettings}
+            onDiscardPreview={discardPreview}
             onEdit={() => setIsEditingPlan(true)}
             onGenerate={generatePlan}
             onSave={() => saveDurableContext("plan")}
@@ -671,6 +713,7 @@ export default function Home() {
             planCalendarView={planCalendarView}
             planContext={planContext}
             planSetupMode={planSetupMode}
+            previewPlan={previewStructuredPlan}
             selectedPlanDate={selectedPlanDate}
             selectedPlanWeek={selectedPlanWeek}
             setPlanCalendarView={setPlanCalendarView}
@@ -702,7 +745,10 @@ function PlanWorkspace({
   activities,
   isEditingPlan,
   isSavingContext,
+  onAcceptPreview,
+  onAdjustPreview,
   onCancel,
+  onDiscardPreview,
   onEdit,
   onGenerate,
   onSave,
@@ -710,6 +756,7 @@ function PlanWorkspace({
   planCalendarView,
   planContext,
   planSetupMode,
+  previewPlan,
   selectedPlanDate,
   selectedPlanWeek,
   setPlanCalendarView,
@@ -734,7 +781,10 @@ function PlanWorkspace({
   activities: Activity[];
   isEditingPlan: boolean;
   isSavingContext: boolean;
+  onAcceptPreview: () => void;
+  onAdjustPreview: () => void;
   onCancel: () => void;
+  onDiscardPreview: () => void;
   onEdit: () => void;
   onGenerate: () => void;
   onSave: () => void;
@@ -742,6 +792,7 @@ function PlanWorkspace({
   planCalendarView: PlanCalendarView;
   planContext: string;
   planSetupMode: PlanSetupMode;
+  previewPlan?: StructuredTrainingPlan;
   selectedPlanDate: string;
   selectedPlanWeek: number;
   setPlanCalendarView: (value: PlanCalendarView) => void;
@@ -948,6 +999,14 @@ function PlanWorkspace({
         </aside>
 
         <section className="planViewer">
+          {previewPlan ? (
+            <PlanPreviewPanel
+              onAccept={onAcceptPreview}
+              onAdjust={onAdjustPreview}
+              onDiscard={onDiscardPreview}
+              plan={previewPlan}
+            />
+          ) : null}
           {plan ? (
             <>
               <div className="calendarToolbar" aria-label="Plan calendar controls">
@@ -1062,6 +1121,90 @@ function PlanWorkspace({
           )}
         </section>
       </section>
+    </section>
+  );
+}
+
+function PlanPreviewPanel({
+  onAccept,
+  onAdjust,
+  onDiscard,
+  plan
+}: {
+  onAccept: () => void;
+  onAdjust: () => void;
+  onDiscard: () => void;
+  plan: StructuredTrainingPlan;
+}) {
+  const generator = plan.generator;
+  const warnings = generator?.warnings ?? [];
+  const rows = weeklyPreviewRows(plan);
+  const metrics = [
+    { label: "Goal", value: plan.raceDistance ? raceDistanceLabel(plan.raceDistance) : "Base builder" },
+    { label: "Status", value: generator?.status ? statusText(generator.status) : "Unknown" },
+    { label: "Requested peak", value: `${generator?.inputs.requestedTargetMilesPerWeek ?? "n/a"} MPW` },
+    { label: "Generated peak", value: `${generator?.plannedPeakMilesPerWeek ?? peakPlanMileage(plan) ?? "n/a"} MPW` },
+    { label: "Peak long run", value: `${peakLongRunMiles(plan)} mi` },
+    { label: "Duration", value: `${plan.durationWeeks} weeks` },
+    { label: "Days / week", value: generator?.inputs.daysPerWeek ?? "n/a" },
+    { label: "Aggression", value: generator?.inputs.aggression ?? "n/a" }
+  ];
+
+  return (
+    <section className="planPreviewPanel">
+      <header className="previewHeader">
+        <div>
+          <p className="eyebrow">Preview</p>
+          <h3>{plan.name}</h3>
+          <p>{generator?.status ? `${statusText(generator.status)} preview. Review tradeoffs before replacing the active plan.` : "Review this preview before replacing the active plan."}</p>
+        </div>
+        <div className="previewActions">
+          <button className="miniButton" onClick={onAccept} type="button">
+            Use this plan
+          </button>
+          <button className="miniButton secondaryMini" onClick={onAdjust} type="button">
+            Adjust settings
+          </button>
+          <button className="miniButton secondaryMini" onClick={onDiscard} type="button">
+            Discard
+          </button>
+        </div>
+      </header>
+      <div className="previewMetricGrid">
+        {metrics.map((metric) => (
+          <div className="previewMetric" key={metric.label}>
+            <small>{metric.label}</small>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
+      {warnings.length ? (
+        <ul className="planWarnings previewWarnings">
+          {warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="previewWeekTable">
+        <div className="previewWeekHeader">
+          <span>Week</span>
+          <span>Focus</span>
+          <span>Mileage</span>
+          <span>Long run</span>
+          <span>Workout</span>
+          <span>Status</span>
+        </div>
+        {rows.map((row) => (
+          <div className="previewWeekRow" key={row.weekNumber}>
+            <span>{row.weekNumber}</span>
+            <strong>{row.focus}</strong>
+            <span>{row.targetMiles} mi</span>
+            <span>{row.longRunMiles} mi</span>
+            <span>{row.workoutLabel ?? "None"}</span>
+            <span className={`previewSeverity ${row.severity}`}>{row.severity}</span>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1421,6 +1564,12 @@ function statusLabel(status: TrainingStatus) {
 function statusText(status: "feasible" | "compromised" | "not_recommended") {
   if (status === "not_recommended") return "Not recommended";
   return status[0].toUpperCase() + status.slice(1);
+}
+
+function raceDistanceLabel(distance: NonNullable<StructuredTrainingPlan["raceDistance"]>) {
+  if (distance === "half_marathon") return "Half marathon";
+  if (distance === "marathon") return "Marathon";
+  return distance.toUpperCase();
 }
 
 function metricSeverity(finding: RiskFinding | undefined): "green" | "yellow" | "red" {

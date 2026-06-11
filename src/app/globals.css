@@ -689,6 +689,117 @@ label span {
   min-height: 90px;
 }
 
+.planPreviewPanel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.previewHeader {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.previewHeader h3 {
+  font-size: 1.25rem;
+  margin: 0 0 6px;
+}
+
+.previewHeader p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.previewActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.previewMetricGrid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.previewMetric {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.previewMetric small,
+.previewWeekHeader {
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.previewMetric strong {
+  font-size: 0.95rem;
+}
+
+.previewWarnings {
+  margin-top: 0;
+}
+
+.previewWeekTable {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.previewWeekHeader,
+.previewWeekRow {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 56px minmax(140px, 1.2fr) 90px 90px minmax(130px, 1fr) 80px;
+  min-width: 720px;
+  padding: 9px 10px;
+}
+
+.previewWeekHeader {
+  background: var(--surface);
+  font-weight: 800;
+}
+
+.previewWeekRow {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.previewWeekRow strong {
+  color: var(--ink);
+}
+
+.previewSeverity {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.previewSeverity.green {
+  color: var(--green);
+}
+
+.previewSeverity.yellow {
+  color: var(--warm);
+}
+
+.previewSeverity.red {
+  color: var(--danger);
+}
+
 .planViewer {
   display: grid;
   gap: 12px;
@@ -1272,10 +1383,15 @@ input:disabled {
 
   .reviewToolbar,
   .runHeader,
+  .previewHeader,
   .planHero,
   .weekHeader {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .previewActions {
+    justify-content: flex-start;
   }
 }
 
@@ -1285,10 +1401,11 @@ input:disabled {
   }
 
   .navActions,
-  .metricLine,
-  .planMetricGrid,
-  .planControlGrid,
-  .calendarToolbar {
+    .metricLine,
+    .planMetricGrid,
+    .previewMetricGrid,
+    .planControlGrid,
+    .calendarToolbar {
     grid-template-columns: 1fr;
   }
 

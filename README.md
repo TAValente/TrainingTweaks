@@ -134,7 +134,7 @@ Structured plan data is stored inside the existing per-user app state JSON. The 
 
 TrainingTweaks also includes deterministic Plan Generator v1 for base builder, half marathon, and marathon plans. It uses Strava-derived baseline mileage and long-run history, goal type, horizon, running days per week, target peak mileage, and conservative/balanced/aggressive posture to compile a structured plan. The generator builds weekly mileage first, then long-run progression, workout mileage, easy mileage filler, and validation warnings. If the requested target is not reachable under the selected settings, it generates the best honest plan and records a feasible, compromised, or not-recommended status with warnings.
 
-The Plan tab lets a runner generate a deterministic plan, anchor it to a real calendar start date, and review each week with expected load, intensity, durability, validation status, and day-by-day workouts.
+The Plan tab lets a runner generate a deterministic plan preview, review tradeoffs, and explicitly accept it before it replaces the active structured plan. Accepted plans can be anchored to a real calendar start date and reviewed by expected load, intensity, durability, validation status, and day-by-day workouts.
 
 This keeps the app ready for plan-aware projections while avoiding app-shipped copies of popular published programs. The intended third-party path is bring-your-own-plan import, while TrainingTweaks-authored generic plans can be designed collaboratively inside the product.
 
