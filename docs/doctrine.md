@@ -198,6 +198,10 @@ Example:
 
 This information may improve future recommendations. The feedback loop is a core asset of the system.
 
+Recommendation Fulfillment Trace is the bridge between a recommendation and later observed behavior. It records the workout intent, expected exposure bounds, acceptable substitutions or schedule shifts, not-aligned behavior, active tension traces, and the runner tension snapshot used at recommendation time.
+
+Fulfillment is based on workout intent, not just a calendar observation window. If TrainingTweaks recommends a Sunday long run and the runner completes the same long-run intent on Monday, that may be shifted-but-aligned rather than skipped. Date tolerance can help future matching, but the core question is whether the intended training outcome happened in an aligned way.
+
 Feedback should combine explicit and inferred signals.
 
 Explicit signals should be lightweight, such as thumbs up or thumbs down on a recommendation. These signals tell TrainingTweaks whether the advice felt useful, respectful, and appropriately calibrated.

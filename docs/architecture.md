@@ -163,6 +163,7 @@ Fields:
 - runner tension snapshot
 - risk signals
 - recommendation
+- recommendation fulfillment trace
 - intended recommendation direction
 - alternatives
 - confidence
@@ -172,6 +173,23 @@ Fields:
 - outcome
 
 Most future product functionality should be evaluated through the lens of improving decision quality.
+
+### Recommendation Fulfillment Trace
+
+A lightweight expectation record created when TrainingTweaks makes a recommendation.
+
+It preserves:
+
+- recommended action summary
+- target workout intent
+- expected exposure bounds
+- acceptable substitutions or schedule shifts
+- not-aligned behavior
+- active runner tension traces
+- runner tension snapshot used at recommendation time
+- expected risk or exposure context when available
+
+Fulfillment is workout-intent-based, not merely calendar-window-based. A long run shifted by an acceptable day can be shifted-but-aligned; a modified run can still be aligned if it stays within the recommendation's exposure bounds or accepted alternative.
 
 ## Storage Boundaries
 

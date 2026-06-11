@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       trainingContext: context,
       runningContext: modelCall.runningContext,
       runnerTensionSnapshot: modelCall.runnerTensionSnapshot,
+      recommendationFulfillmentTrace: modelCall.recommendationFulfillmentTrace,
       model: modelCall.model,
       openAIRequest: modelCall.openAIRequest,
       rawModelResponse: modelCall.rawModelResponse,

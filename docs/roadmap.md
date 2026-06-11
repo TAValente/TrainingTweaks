@@ -50,10 +50,15 @@ A recommendation is not complete until the system can later compare:
 
 Persist decisions so recommendations and decision frameworks can be evaluated after the fact.
 
+Recommendation Fulfillment Trace is the v1 bridge from recommendation to future observed behavior matching. It should record what training outcome the recommendation was trying to create: target workout intent, exposure bounds, acceptable substitutions or schedule shifts, not-aligned behavior, active tension traces, the runner tension snapshot, and available risk/exposure context.
+
+This is not primarily a calendar observation window. If a recommended long run shifts from Sunday to Monday but preserves the same intent and acceptable exposure, future matching should be able to call it shifted-but-aligned instead of skipped.
+
 Scope:
 
 - question
 - context snapshot
+- recommendation fulfillment trace
 - expectation or forecast
 - risk signals
 - recommendation
@@ -62,7 +67,7 @@ Scope:
 - intended recommendation direction
 - actual behavior observed from Strava
 - user feedback when available
-- adherence classification: exact, partial, directionally aligned, ignored, unknown
+- fulfillment classification: fulfilled, shifted-but-aligned, modified-but-aligned, accepted alternative, chose opposite side, skipped, unknown, not enough data
 - outcome notes
 - suggested framework adjustment
 

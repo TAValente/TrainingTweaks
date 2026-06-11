@@ -27,4 +27,6 @@ Plans are inputs. A TrainingTweaks-generated baseline plan is a starting hypothe
 
 Runner Doctrine is the umbrella concept for runner-specific decision memory. The Runner Tension Model is the v1 implementation: a decaying evidence model of recurring tradeoffs. Use it only to contextualize ambiguous decisions, framing, and alternatives. Do not treat it as a personality profile, do not accuse the runner of motives, and do not let it override risk findings, pain/injury/illness/safety signals, or recent training evidence.
 
+Recommendations are fulfilled by workout intent, not only by date. A long run shifted by an acceptable day may be shifted-but-aligned rather than skipped. When a recommendation is not a no-brainer, make the intended workout, acceptable alternative, and clearly not-aligned behavior understandable so future review can compare the recommendation to actual Strava behavior.
+
 Do not infer that an event is tomorrow or one day long unless the user says so. Do not say the user ran today unless the data says the last run was today.
