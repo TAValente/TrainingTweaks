@@ -21,7 +21,8 @@ test("base builder creates a sane build and cutback pattern", () => {
   assert.equal(result.ok, true);
   const plan = result.plan;
   assert.equal(plan.raceDistance, undefined);
-  assert.equal(plan.generator?.status, "feasible");
+  assert.equal(plan.generator?.status, "compromised");
+  assert.match(result.warnings.join(" "), /8 week timeline is shorter than the 9 weeks/i);
   assert.deepEqual(plan.weeks.slice(0, 5).map((week) => week.targetMiles), [18, 20, 22, 17, 24]);
   assert.equal(plan.weeks[0].days.length, 4);
   assert.ok(longRuns(plan).every((longRun) => longRun >= 5));
@@ -62,6 +63,41 @@ test("marathon from 30 MPW to 40 MPW is feasible with enough timeline", () => {
   assert.equal(result.plan.generator?.status, "feasible");
   assert.ok((result.plan.generator?.plannedPeakMilesPerWeek ?? 0) >= 40);
   assert.ok(preRacePeakLongRun(result.plan) >= 16);
+});
+
+test("math-driven duration accounts for inserted cutback weeks", () => {
+  const result = generateTrainingPlan({
+    activities: runsFromWeeklyMileage([18, 18, 18, 18, 18, 18], 6),
+    goalType: "base_builder",
+    startDate: "2026-06-15",
+    daysPerWeek: 4,
+    targetPeakMilesPerWeek: 34,
+    aggression: "balanced",
+    asOfDate
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.plan.generator?.status, "feasible");
+  assert.equal(result.plan.generator?.inputs.requestedHorizonWeeks, undefined);
+  assert.ok((result.plan.generator?.inputs.actualHorizonWeeks ?? 0) > 8);
+  assert.ok((result.plan.generator?.plannedPeakMilesPerWeek ?? 0) >= 34);
+  assert.ok(result.plan.weeks.some((week) => week.focus === "Cutback and consolidate"));
+});
+
+test("marathon with enough timeline reaches preferred long-run target when feasible", () => {
+  const result = generateTrainingPlan({
+    activities: runsFromWeeklyMileage([30, 30, 30, 30, 30, 30], 10),
+    goalType: "marathon",
+    startDate: "2026-06-15",
+    horizonWeeks: 24,
+    daysPerWeek: 4,
+    targetPeakMilesPerWeek: 40,
+    aggression: "balanced",
+    asOfDate
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(preRacePeakLongRun(result.plan) >= 18);
 });
 
 test("short marathon timeline generates reachable lower peak and warns", () => {
@@ -142,6 +178,48 @@ test("easy runs are even when possible without erasing anchors", () => {
     .map((day) => day.workout.targetMiles ?? 0);
   assert.ok(Math.max(...easyRuns) - Math.min(...easyRuns) <= 1);
   assert.ok(longestRun(firstWeek) > Math.max(...easyRuns));
+});
+
+test("five and six day Sunday long-run schedules preserve Monday rest", () => {
+  for (const daysPerWeek of [5, 6]) {
+    const result = generateTrainingPlan({
+      activities: runsFromWeeklyMileage([30, 30, 30, 30, 30, 30], 9),
+      goalType: "half_marathon",
+      startDate: "2026-06-15",
+      horizonWeeks: 12,
+      daysPerWeek,
+      targetPeakMilesPerWeek: 36,
+      aggression: "balanced",
+      asOfDate,
+      preferredLongRunDay: "sunday"
+    });
+
+    assert.equal(result.ok, true);
+    const runDays = new Set(result.plan.weeks[0].days.map((day) => day.dayOfWeek));
+    assert.equal(runDays.has("sunday"), true);
+    assert.equal(runDays.has("monday"), false);
+    assert.equal(result.plan.weeks[0].days.length, daysPerWeek);
+  }
+});
+
+test("40 MPW plans use the configured 6 mile easy-run floor when feasible", () => {
+  const result = generateTrainingPlan({
+    activities: runsFromWeeklyMileage([40, 40, 40, 40, 40, 40], 12),
+    goalType: "half_marathon",
+    startDate: "2026-06-15",
+    horizonWeeks: 10,
+    daysPerWeek: 5,
+    targetPeakMilesPerWeek: 40,
+    aggression: "balanced",
+    asOfDate
+  });
+
+  assert.equal(result.ok, true);
+  const firstWeekEasyRuns = result.plan.weeks[0].days
+    .filter((day) => day.workout.type === "recovery")
+    .map((day) => day.workout.targetMiles ?? 0);
+  assert.ok(firstWeekEasyRuns.length > 0);
+  assert.ok(firstWeekEasyRuns.every((miles) => miles >= 6));
 });
 
 test("cutback does not reset future growth from the pre-cutback peak", () => {

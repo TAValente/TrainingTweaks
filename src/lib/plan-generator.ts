@@ -381,15 +381,17 @@ function requiredPlanWeeks(input: {
   goal: GoalConfig;
   aggression: AggressionConfig;
 }) {
-  const mileageWeeks = buildWeeksNeeded(
+  const mileageBuildWeeks = buildWeeksNeeded(
     input.baseline.startingMilesPerWeek,
     input.targetPeakMilesPerWeek,
     input.aggression.weeklyGrowthCap,
     planGeneratorConfig.minimumAcceptableWeeklyGain
   );
-  const targetLongRun = input.goal.crediblePeakLongRun ?? input.targetPeakMilesPerWeek * input.goal.longRunShare.preferred;
-  const longRunWeeks = Math.ceil(Math.max(0, targetLongRun - input.baseline.recentLongRunMiles) / input.aggression.longRunGrowthCap);
-  return Math.max(input.goal.minimumWeeks, mileageWeeks, longRunWeeks) + input.goal.peakLeadWeeks;
+  const targetLongRun = targetPeakLongRun(input.goal, input.targetPeakMilesPerWeek);
+  const longRunBuildWeeks =
+    Math.ceil(Math.max(0, targetLongRun - input.baseline.recentLongRunMiles) / input.aggression.longRunGrowthCap) + 1;
+  const buildProgressWeeks = Math.max(input.goal.minimumWeeks, mileageBuildWeeks, longRunBuildWeeks);
+  return weeksWithCutbacks(buildProgressWeeks) + input.goal.peakLeadWeeks;
 }
 
 function requestedPlanWeeks(input: PlanGeneratorInput, asOfDate: Date) {
@@ -489,7 +491,7 @@ function buildWeek(input: {
     0,
     targetMiles - reserved.reduce((total, runDay) => total + (runDay.workout.targetMiles ?? 0), 0)
   );
-  const easyRuns = distributeEasyRuns(remainingMiles, easyDays.length, input.anchor.longRunMiles).map((mileage, index) =>
+  const easyRuns = distributeEasyRuns(remainingMiles, easyDays.length, input.anchor.longRunMiles, targetMiles).map((mileage, index) =>
     day(easyDays[index], {
       type: mileage <= 0 ? "rest" : "recovery",
       label: mileage <= 0 ? "Rest" : "Easy run",
@@ -551,9 +553,9 @@ function workoutForWeek(
   };
 }
 
-function distributeEasyRuns(totalMiles: number, count: number, longRunMiles: number) {
+function distributeEasyRuns(totalMiles: number, count: number, longRunMiles: number, weeklyMileage: number) {
   if (count <= 0) return [];
-  const floor = easyRunFloor(totalMiles + longRunMiles);
+  const floor = easyRunFloor(weeklyMileage);
   const cap = easyRunCap(longRunMiles);
   const even = roundWhole(totalMiles / count);
   const miles = Array.from({ length: count }, () => clamp(even, Math.min(floor, totalMiles), cap));
@@ -576,8 +578,12 @@ function scheduleRunDays(daysPerWeek: number, longRunDay: TrainingPlanDayOfWeek,
   const preferred = {
     3: ["tuesday", "thursday", longRunDay],
     4: ["tuesday", "wednesday", "friday", longRunDay],
-    5: ["monday", "tuesday", "wednesday", "friday", longRunDay],
-    6: ["monday", "tuesday", "wednesday", "thursday", "friday", longRunDay]
+    5: longRunDay === "sunday"
+      ? ["tuesday", "wednesday", "thursday", "friday", longRunDay]
+      : ["monday", "tuesday", "wednesday", "friday", longRunDay],
+    6: longRunDay === "sunday"
+      ? ["tuesday", "wednesday", "thursday", "friday", "saturday", longRunDay]
+      : ["monday", "tuesday", "wednesday", "thursday", "friday", longRunDay]
   } as Record<number, TrainingPlanDayOfWeek[]>;
   const days = [...(preferred[daysPerWeek] ?? preferred[4])];
   const workoutDay = workoutDayForLongRun(longRunDay);
@@ -697,6 +703,13 @@ function buildWeeksNeeded(start: number, target: number, growthCap: number, mini
   return weeks;
 }
 
+function weeksWithCutbacks(buildProgressWeeks: number) {
+  const buildWeeksBeforeCutback = planGeneratorConfig.cutback.buildWeeksBeforeCutback;
+  if (buildProgressWeeks <= buildWeeksBeforeCutback) return buildProgressWeeks;
+  const cutbacks = Math.floor((buildProgressWeeks - 1) / buildWeeksBeforeCutback);
+  return buildProgressWeeks + cutbacks;
+}
+
 function nextBuildMileage(current: number, growthCap: number, minimumGain = planGeneratorConfig.minimumAcceptableWeeklyGain) {
   return roundWhole(current + Math.max(minimumGain, current * growthCap));
 }
@@ -710,11 +723,15 @@ function nextBuildLongRun(input: {
 }) {
   const share = preferredLongRunShare(input.goalType, input.targetPeakMileage, input.goal);
   const maxShare = maxLongRunShare(input.goalType, input.targetPeakMileage, input.goal);
-  const desired = input.goal.crediblePeakLongRun
-    ? Math.max(input.goal.crediblePeakLongRun, input.targetPeakMileage * share)
-    : input.targetPeakMileage * share;
+  const desired = Math.max(targetPeakLongRun(input.goal, input.targetPeakMileage), input.targetPeakMileage * share);
   const cappedDesired = Math.min(desired, input.targetPeakMileage * maxShare);
   return roundWhole(Math.min(cappedDesired, input.currentPeak + input.aggression.longRunGrowthCap));
+}
+
+function targetPeakLongRun(goal: GoalConfig, targetPeakMileage: number) {
+  const shareBased = targetPeakMileage * goal.longRunShare.preferred;
+  const preferred = goal.preferredPeakLongRun ?? goal.crediblePeakLongRun ?? shareBased;
+  return Math.min(Math.max(preferred, goal.crediblePeakLongRun ?? 0, shareBased), targetPeakMileage * goal.longRunShare.max);
 }
 
 function preferredLongRunShare(goalType: TrainingPlanGeneratorGoal, weeklyMileage: number, goal: GoalConfig) {
