@@ -27,6 +27,58 @@ test("rest plannedToday guidance treats rest as a real plan recommendation", () 
   assert.match(guidance, /not missing plan data/i);
 });
 
+test("before_plan guidance says plan has not started and does not use plannedToday as the starting point", () => {
+  const guidance = activePlanGuidanceForPrompt({
+    activePlanSnapshot: nonInPlanSnapshot("before_plan", "Active plan has not started yet.")
+  });
+
+  assert.match(guidance, /has not started yet/i);
+  assert.match(guidance, /future context/i);
+  assert.match(guidance, /Do not treat plannedToday as today's recommendation/i);
+  assert.doesNotMatch(guidance, /Treat plannedToday as the starting point/i);
+  assert.match(guidance, /Do not use a rigid visible template/i);
+});
+
+test("after_plan guidance says plan has ended and does not anchor recommendation to it", () => {
+  const guidance = activePlanGuidanceForPrompt({
+    activePlanSnapshot: nonInPlanSnapshot("after_plan", "Active plan has ended.")
+  });
+
+  assert.match(guidance, /has ended/i);
+  assert.match(guidance, /Do not anchor today's recommendation to the ended plan/i);
+  assert.doesNotMatch(guidance, /Treat plannedToday as the starting point/i);
+  assert.match(guidance, /Do not use a rigid visible template/i);
+});
+
+test("invalid_plan guidance says plan is unusable and does not anchor recommendation to it", () => {
+  const guidance = activePlanGuidanceForPrompt({
+    activePlanSnapshot: nonInPlanSnapshot("invalid_plan", "Active plan has an invalid start date or duration.")
+  });
+
+  assert.match(guidance, /unusable/i);
+  assert.match(guidance, /invalid/i);
+  assert.match(guidance, /Do not anchor today's recommendation to the invalid plan/i);
+  assert.doesNotMatch(guidance, /Treat plannedToday as the starting point/i);
+  assert.match(guidance, /Do not use a rigid visible template/i);
+});
+
+test("no_plan guidance remains explicit without planned mileage", () => {
+  const guidance = activePlanGuidanceForPrompt({
+    activePlanSnapshot: {
+      status: "no_plan",
+      deviation: {
+        status: "unknown",
+        message: "No active structured plan is accepted."
+      }
+    }
+  });
+
+  assert.match(guidance, /No accepted active plan is available/i);
+  assert.match(guidance, /Do not invent planned mileage/i);
+  assert.doesNotMatch(guidance, /Treat plannedToday as the starting point/i);
+  assert.match(guidance, /Do not use a rigid visible template/i);
+});
+
 test("ahead deviation guidance cautions against adding mileage or intensity", () => {
   const guidance = activePlanGuidanceForPrompt({
     activePlanSnapshot: snapshotFixture({ deviationStatus: "ahead" })
@@ -82,6 +134,22 @@ function snapshotFixture(options: {
     deviation: {
       status: deviationStatus,
       message: `Fixture is ${deviationStatus}.`
+    }
+  };
+}
+
+function nonInPlanSnapshot(
+  status: Exclude<ActivePlanSnapshot["status"], "in_plan" | "no_plan">,
+  message: string
+): ActivePlanSnapshot {
+  return {
+    status,
+    planName: "Plan-aware fixture",
+    planStartDate: "2026-06-15",
+    planDurationWeeks: 12,
+    deviation: {
+      status: "unknown",
+      message
     }
   };
 }
