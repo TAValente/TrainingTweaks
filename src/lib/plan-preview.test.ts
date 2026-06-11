@@ -4,6 +4,7 @@ import {
   acceptPreviewPlan,
   activePlanForContext,
   discardPreviewPlan,
+  peakLongRunMiles,
   previewGeneratedPlan,
   weeklyPreviewRows
 } from "./plan-preview.ts";
@@ -98,6 +99,49 @@ test("preview weekly rows expose summary and warning severity", () => {
     workoutLabel: "Controlled quality",
     severity: "yellow"
   });
+});
+
+test("preview peak long run excludes marathon race week when possible", () => {
+  const preview = planFixture("marathon-preview", "Marathon preview");
+  preview.raceDistance = "marathon";
+  preview.weeks = [
+    {
+      weekNumber: 1,
+      focus: "Peak week",
+      targetMiles: 45,
+      days: [
+        {
+          dayOfWeek: "sunday",
+          workout: {
+            type: "long_run",
+            label: "Long run",
+            targetMiles: 20,
+            intensity: "easy",
+            purpose: "Peak training long run"
+          }
+        }
+      ]
+    },
+    {
+      weekNumber: 2,
+      focus: "Race week",
+      targetMiles: 30,
+      days: [
+        {
+          dayOfWeek: "sunday",
+          workout: {
+            type: "long_run",
+            label: "Marathon day",
+            targetMiles: 26.2,
+            intensity: "hard",
+            purpose: "Race execution"
+          }
+        }
+      ]
+    }
+  ];
+
+  assert.equal(peakLongRunMiles(preview), 20);
 });
 
 function planFixture(

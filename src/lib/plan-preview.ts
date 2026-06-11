@@ -31,7 +31,10 @@ export function activePlanForContext(state: PlanPreviewState) {
 }
 
 export function peakLongRunMiles(plan: StructuredTrainingPlan) {
-  return Math.max(0, ...plan.weeks.map((week) => Math.max(0, ...week.days.map((day) => day.workout.targetMiles ?? 0))));
+  const nonRaceLongRuns = longRunMilesForWeeks(plan.weeks.filter((week) => week.focus !== "Race week"));
+  if (nonRaceLongRuns.length) return Math.max(...nonRaceLongRuns);
+  const allLongRuns = longRunMilesForWeeks(plan.weeks);
+  return Math.max(0, ...allLongRuns);
 }
 
 export function weeklyPreviewRows(plan: StructuredTrainingPlan) {
@@ -60,4 +63,10 @@ function strongestSeverity(severities: Array<"green" | "yellow" | "red">) {
   if (severities.includes("yellow")) return "yellow";
   if (severities.includes("green")) return "green";
   return "green";
+}
+
+function longRunMilesForWeeks(weeks: StructuredTrainingPlan["weeks"]) {
+  return weeks.flatMap((week) =>
+    week.days.filter((day) => day.workout.type === "long_run").map((day) => day.workout.targetMiles ?? 0)
+  );
 }
