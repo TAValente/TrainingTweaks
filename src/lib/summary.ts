@@ -1,7 +1,8 @@
 import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
-import { defaultTimeZone, localDateParts } from "./calendar";
-import { buildLoadRiskContext, computeRiskFindings } from "./risk";
-import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "./structured-plans";
+import { buildActivePlanSnapshot } from "./active-plan-snapshot.ts";
+import { defaultTimeZone, localDateParts } from "./calendar.ts";
+import { buildLoadRiskContext, computeRiskFindings } from "./risk.ts";
+import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "./structured-plans.ts";
 
 const metersPerMile = 1609.344;
 
@@ -66,13 +67,17 @@ export function buildActivitySummary(activities: Activity[], now = new Date()): 
 export function contextForPrompt(
   activities: Activity[],
   context: TrainingContext,
-  question: string
+  question: string,
+  now = new Date()
 ) {
-  const now = new Date();
   const timeZone = defaultTimeZone;
   const today = localDateParts(now, timeZone);
   const summary = buildActivitySummary(activities, now);
   const structuredTrainingPlan = structuredPlanSnapshot(context.structuredPlan, { localDate: today.date });
+  const activePlanSnapshot = buildActivePlanSnapshot(context.structuredPlan, activities, {
+    localDate: today.date,
+    completedMilesLast7Days: summary.mileageLast7Days
+  });
   const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredTrainingPlan);
   const loadRiskContext = buildLoadRiskContext(activities, now, undefined, plannedWorkout);
   const riskFindings = computeRiskFindings({ activities, asOfDate: now, plannedWorkout });
@@ -129,6 +134,7 @@ export function contextForPrompt(
       source: context.planSource || "unknown",
       variant: context.planVariant || "Not provided"
     },
+    activePlanSnapshot,
     structuredTrainingPlan,
     planContext: context.planContext || "Not provided",
     goalsContext: context.goalsContext || "Not provided",

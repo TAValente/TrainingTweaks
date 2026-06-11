@@ -10,6 +10,7 @@ import {
   weeklyPreviewRows,
   type PlanPreviewState
 } from "@/lib/plan-preview";
+import { buildActivePlanSnapshot, type ActivePlanSnapshot } from "@/lib/active-plan-snapshot";
 import { structuredPlanSummary } from "@/lib/structured-plans";
 import type {
   Activity,
@@ -32,6 +33,7 @@ type AppState = {
   activities: Activity[];
   context?: TrainingContext;
   summary: ActivitySummary;
+  activePlanSnapshot?: ActivePlanSnapshot;
   riskFindings?: RiskFinding[];
 };
 
@@ -217,6 +219,7 @@ export default function Home() {
         lastRefreshAt: payload.refreshedAt,
         activities: payload.activities,
         summary: payload.summary,
+        activePlanSnapshot: payload.activePlanSnapshot,
         riskFindings: payload.riskFindings
       }));
       const currentMileageEstimate = estimateCurrentMilesPerWeek(payload.summary);
@@ -353,7 +356,11 @@ export default function Home() {
       context: {
         ...current.context,
         structuredPlan
-      }
+      },
+      activePlanSnapshot: buildActivePlanSnapshot(structuredPlan, current.activities, {
+        localDate: todayIsoDate(),
+        completedMilesLast7Days: current.summary.mileageLast7Days
+      })
     }));
     setPreviewStructuredPlan(accepted.previewStructuredPlan);
     setPlanSource("custom");
@@ -512,9 +519,10 @@ export default function Home() {
         {error ? <section className="errorLine">{error}</section> : null}
 
         {activeTab === "today" ? (
-        <section className="coreGrid">
-          <section className="workspace">
-          <div className="contextRow">
+          <section className="coreGrid">
+            <section className="workspace">
+              <ActivePlanCard snapshot={state.activePlanSnapshot} />
+              <div className="contextRow">
             <label className={isEditingGoals ? "" : "locked"}>
               <span className="fieldHeader">
                 Goals context
@@ -738,6 +746,46 @@ export default function Home() {
         )}
       </section>
     </main>
+  );
+}
+
+function ActivePlanCard({ snapshot }: { snapshot?: ActivePlanSnapshot }) {
+  const status = snapshot?.status ?? "no_plan";
+  const plannedToday = snapshot?.plannedToday;
+  const week = snapshot?.currentPlanWeek;
+  const observed = snapshot?.observed;
+  const deviation = snapshot?.deviation;
+
+  return (
+    <section className="activePlanCard">
+      <header>
+        <div>
+          <p className="eyebrow">Today's plan</p>
+          <h3>{plannedToday ? plannedToday.label : activePlanStatusTitle(status)}</h3>
+        </div>
+        <strong className={`activePlanStatus ${deviation?.status ?? "unknown"}`}>{activePlanDeviationLabel(deviation?.status)}</strong>
+      </header>
+      {plannedToday ? (
+        <div className="activePlanGrid">
+          <Metric label="Planned today" value={plannedToday.targetMiles ? `${plannedToday.targetMiles} mi` : plannedToday.type} />
+          <Metric label="Intensity" value={plannedToday.intensity} />
+          <Metric label="Plan week" value={week ? `${week.weekNumber}/${snapshot?.planDurationWeeks ?? "?"}` : "n/a"} />
+          <Metric
+            label="Week progress"
+            value={`${observed?.completedMilesThisPlanWeek ?? 0} / ${week?.plannedMilesThroughToday ?? 0} mi`}
+          />
+        </div>
+      ) : (
+        <p className="muted">{snapshot?.deviation.message ?? "No active structured plan is accepted."}</p>
+      )}
+      {week ? (
+        <p className="muted">
+          {snapshot?.planName}: {week.focus}, {week.targetMiles ?? 0} mi week, {week.longRunMiles} mi long run.{" "}
+          {observed?.completedMilesLast7Days !== undefined ? `${observed.completedMilesLast7Days} mi in the last 7 days.` : ""}
+        </p>
+      ) : null}
+      {plannedToday && deviation?.message ? <p className="muted">{deviation.message}</p> : null}
+    </section>
   );
 }
 
@@ -1559,6 +1607,20 @@ function statusLabel(status: TrainingStatus) {
   if (status === "de-training") return "De-training";
   if (status === "high-risk") return "High risk";
   return status[0].toUpperCase() + status.slice(1);
+}
+
+function activePlanStatusTitle(status: ActivePlanSnapshot["status"]) {
+  if (status === "before_plan") return "Plan has not started";
+  if (status === "after_plan") return "Plan has ended";
+  if (status === "invalid_plan") return "Plan date issue";
+  return "No active plan";
+}
+
+function activePlanDeviationLabel(status: ActivePlanSnapshot["deviation"]["status"] | undefined) {
+  if (status === "on_track") return "On track";
+  if (status === "ahead") return "Ahead";
+  if (status === "behind") return "Behind";
+  return "Unknown";
 }
 
 function statusText(status: "feasible" | "compromised" | "not_recommended") {
