@@ -160,6 +160,9 @@ export type TrainingPlanWeek = {
 };
 
 export type TrainingPlanRiskTolerance = "low" | "regular" | "high";
+export type TrainingPlanGeneratorGoal = "base_builder" | "half_marathon" | "marathon";
+export type TrainingPlanGeneratorAggression = "conservative" | "balanced" | "aggressive";
+export type TrainingPlanGeneratorStatus = "feasible" | "compromised" | "not_recommended";
 
 export type TrainingPlanRiskSeverity = "green" | "yellow" | "red";
 
@@ -194,12 +197,22 @@ export type StructuredTrainingPlanGenerator = {
   version: string;
   plannedPeakMilesPerWeek: number;
   inputs: {
+    goalType?: TrainingPlanGeneratorGoal;
+    daysPerWeek?: number;
+    aggression?: TrainingPlanGeneratorAggression;
+    baselineMilesPerWeek?: number;
+    baselineLongRunMiles?: number;
+    requestedHorizonWeeks?: number;
+    actualHorizonWeeks?: number;
+    targetDate?: string;
     currentMilesPerWeek: number;
     targetMilesPerWeek: number;
     requestedTargetMilesPerWeek: number;
     durationWeeks: number;
     riskTolerance: TrainingPlanRiskTolerance;
   };
+  status?: TrainingPlanGeneratorStatus;
+  warnings?: string[];
   riskRules: TrainingPlanRiskRule[];
   riskBudget: TrainingPlanRiskBudget;
   riskCounts: Record<TrainingPlanRiskSeverity, number>;

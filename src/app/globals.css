@@ -615,6 +615,13 @@ label span {
   margin: 0;
 }
 
+.planWarnings {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
 .planLayout {
   display: grid;
   gap: 16px;

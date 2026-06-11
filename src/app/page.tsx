@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { buildStarterMarathonPlan, type MarathonPlanRiskTolerance } from "@/lib/marathon-plan";
+import { generateTrainingPlan } from "@/lib/plan-generator";
 import { structuredPlanSummary } from "@/lib/structured-plans";
 import type {
   Activity,
@@ -10,6 +10,8 @@ import type {
   RiskSeverity,
   StructuredTrainingPlan,
   TrainingContext,
+  TrainingPlanGeneratorAggression,
+  TrainingPlanGeneratorGoal,
   TrainingPlanDayOfWeek,
   TrainingPlanWorkoutType,
   TrainingPlanWeek,
@@ -58,7 +60,6 @@ const emptySummary: ActivitySummary = {
 const statusScale: TrainingStatus[] = ["de-training", "productive", "risky", "high-risk"];
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const dayOrder: TrainingPlanDayOfWeek[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-const placeholderPlans = ["Placeholder 1", "Placeholder 2", "Placeholder 3"];
 const calendarLegendItems: { kind: CalendarWorkoutKind; label: string }[] = [
   { kind: "workout", label: "Workout" },
   { kind: "recovery", label: "Recovery" },
@@ -113,10 +114,11 @@ export default function Home() {
   const [savedPlanVariant, setSavedPlanVariant] = useState("");
   const [savedPlanContext, setSavedPlanContext] = useState("");
   const [savedStructuredPlan, setSavedStructuredPlan] = useState<StructuredTrainingPlan | undefined>();
-  const [starterCurrentMileage, setStarterCurrentMileage] = useState(0);
+  const [starterGoalType, setStarterGoalType] = useState<TrainingPlanGeneratorGoal>("half_marathon");
+  const [starterDaysPerWeek, setStarterDaysPerWeek] = useState(4);
   const [starterTargetMileage, setStarterTargetMileage] = useState(40);
   const [starterPlanWeeks, setStarterPlanWeeks] = useState(16);
-  const [starterRiskTolerance, setStarterRiskTolerance] = useState<MarathonPlanRiskTolerance>("regular");
+  const [starterAggression, setStarterAggression] = useState<TrainingPlanGeneratorAggression>("balanced");
   const [starterStartDate, setStarterStartDate] = useState(nextMondayIsoDate());
   const [selectedPlanWeek, setSelectedPlanWeek] = useState(1);
   const [selectedPlanDate, setSelectedPlanDate] = useState(todayIsoDate());
@@ -177,7 +179,6 @@ export default function Home() {
     setPlanSource(nextPlanSource);
     setPlanVariant(nextPlanVariant);
     setPlanContext(nextPlanContext);
-    setStarterCurrentMileage(currentMileageEstimate);
     setStarterTargetMileage(Math.max(currentMileageEstimate, peakPlanMileage(nextState.context?.structuredPlan) ?? 40));
     setStarterStartDate(nextState.context?.structuredPlan?.startDate ?? nextMondayIsoDate());
     setSelectedPlanPosition(nextState.context?.structuredPlan, currentCalendarWeek(nextState.context?.structuredPlan));
@@ -209,7 +210,6 @@ export default function Home() {
         riskFindings: payload.riskFindings
       }));
       const currentMileageEstimate = estimateCurrentMilesPerWeek(payload.summary);
-      setStarterCurrentMileage(currentMileageEstimate);
       setStarterTargetMileage((current) => Math.max(current, currentMileageEstimate));
       setStatus(`Imported ${payload.importedCount} recent Strava activities.`);
     } catch (error) {
@@ -309,14 +309,22 @@ export default function Home() {
     window.location.assign("/login");
   }
 
-  function generateStarterMarathonPlan() {
-    const structuredPlan = buildStarterMarathonPlan({
-      currentMilesPerWeek: starterCurrentMileage,
-      targetMilesPerWeek: starterTargetMileage,
-      durationWeeks: starterPlanWeeks,
-      riskTolerance: starterRiskTolerance,
+  function generatePlan() {
+    const result = generateTrainingPlan({
+      activities: state.activities,
+      goalType: starterGoalType,
+      targetPeakMilesPerWeek: starterTargetMileage,
+      horizonWeeks: starterPlanWeeks,
+      daysPerWeek: starterDaysPerWeek,
+      aggression: starterAggression,
       startDate: starterStartDate
     });
+    if (!result.ok) {
+      setError(result.reason);
+      setStatus(result.warnings.join(" "));
+      return;
+    }
+    const structuredPlan = result.plan;
     setState((current) => ({
       ...current,
       context: {
@@ -325,9 +333,14 @@ export default function Home() {
       }
     }));
     setPlanSource("custom");
-    setPlanVariant("TrainingTweaks generic marathon");
+    setPlanVariant(structuredPlan.name);
     setSelectedPlanPosition(structuredPlan, currentCalendarWeek(structuredPlan));
-    setStatus("Starter marathon plan generated. Save plan context to persist it.");
+    setError("");
+    setStatus(
+      result.warnings.length
+        ? `${statusText(result.status)} plan generated with warnings. ${result.warnings[0]}`
+        : `${statusText(result.status)} plan generated. Save plan context to persist it.`
+    );
   }
 
   function setSelectedPlanPosition(plan: StructuredTrainingPlan | undefined, weekNumber: number, date = todayIsoDate()) {
@@ -652,30 +665,30 @@ export default function Home() {
               setIsEditingPlan(false);
             }}
             onEdit={() => setIsEditingPlan(true)}
-            onGenerate={generateStarterMarathonPlan}
+            onGenerate={generatePlan}
             onSave={() => saveDurableContext("plan")}
             plan={visibleStructuredPlan}
             planCalendarView={planCalendarView}
             planContext={planContext}
             planSetupMode={planSetupMode}
-            planVariant={planVariant}
             selectedPlanDate={selectedPlanDate}
             selectedPlanWeek={selectedPlanWeek}
             setPlanCalendarView={setPlanCalendarView}
             setPlanContext={setPlanContext}
             setPlanSetupMode={setPlanSetupMode}
             setPlanSource={setPlanSource}
-            setPlanVariant={setPlanVariant}
             setSelectedPlanDate={setSelectedPlanDate}
             setSelectedPlanWeek={setSelectedPlanWeek}
-            setStarterCurrentMileage={setStarterCurrentMileage}
+            setStarterAggression={setStarterAggression}
+            setStarterDaysPerWeek={setStarterDaysPerWeek}
+            setStarterGoalType={setStarterGoalType}
             setStarterPlanWeeks={setStarterPlanWeeks}
-            setStarterRiskTolerance={setStarterRiskTolerance}
             setStarterStartDate={setStarterStartDate}
             setStarterTargetMileage={setStarterTargetMileage}
-            starterCurrentMileage={starterCurrentMileage}
+            starterAggression={starterAggression}
+            starterDaysPerWeek={starterDaysPerWeek}
+            starterGoalType={starterGoalType}
             starterPlanWeeks={starterPlanWeeks}
-            starterRiskTolerance={starterRiskTolerance}
             starterStartDate={starterStartDate}
             starterTargetMileage={starterTargetMileage}
           />
@@ -697,24 +710,24 @@ function PlanWorkspace({
   planCalendarView,
   planContext,
   planSetupMode,
-  planVariant,
   selectedPlanDate,
   selectedPlanWeek,
   setPlanCalendarView,
   setPlanContext,
   setPlanSetupMode,
   setPlanSource,
-  setPlanVariant,
   setSelectedPlanDate,
   setSelectedPlanWeek,
-  setStarterCurrentMileage,
+  setStarterAggression,
+  setStarterDaysPerWeek,
+  setStarterGoalType,
   setStarterPlanWeeks,
-  setStarterRiskTolerance,
   setStarterStartDate,
   setStarterTargetMileage,
-  starterCurrentMileage,
+  starterAggression,
+  starterDaysPerWeek,
+  starterGoalType,
   starterPlanWeeks,
-  starterRiskTolerance,
   starterStartDate,
   starterTargetMileage
 }: {
@@ -729,24 +742,24 @@ function PlanWorkspace({
   planCalendarView: PlanCalendarView;
   planContext: string;
   planSetupMode: PlanSetupMode;
-  planVariant: string;
   selectedPlanDate: string;
   selectedPlanWeek: number;
   setPlanCalendarView: (value: PlanCalendarView) => void;
   setPlanContext: (value: string) => void;
   setPlanSetupMode: (value: PlanSetupMode) => void;
   setPlanSource: (value: TrainingPlanSource) => void;
-  setPlanVariant: (value: string) => void;
   setSelectedPlanDate: (value: string) => void;
   setSelectedPlanWeek: (value: number) => void;
-  setStarterCurrentMileage: (value: number) => void;
+  setStarterAggression: (value: TrainingPlanGeneratorAggression) => void;
+  setStarterDaysPerWeek: (value: number) => void;
+  setStarterGoalType: (value: TrainingPlanGeneratorGoal) => void;
   setStarterPlanWeeks: (value: number) => void;
-  setStarterRiskTolerance: (value: MarathonPlanRiskTolerance) => void;
   setStarterStartDate: (value: string) => void;
   setStarterTargetMileage: (value: number) => void;
-  starterCurrentMileage: number;
+  starterAggression: TrainingPlanGeneratorAggression;
+  starterDaysPerWeek: number;
+  starterGoalType: TrainingPlanGeneratorGoal;
   starterPlanWeeks: number;
-  starterRiskTolerance: MarathonPlanRiskTolerance;
   starterStartDate: string;
   starterTargetMileage: number;
 }) {
@@ -754,6 +767,7 @@ function PlanWorkspace({
   const selectedWeek = plan?.weeks.find((week) => week.weekNumber === selectedPlanWeek) ?? plan?.weeks[0];
   const selectedMetrics = plan && selectedWeek ? plannedWeekMetrics(plan, selectedWeek) : [];
   const calendarDays = plan ? planCalendarDays(plan, planCalendarView, anchorDate, selectedPlanDate, activities) : [];
+  const generatorWarnings = plan?.generator?.warnings ?? [];
 
   function selectCalendarDate(date: Date) {
     if (!plan) return;
@@ -777,8 +791,16 @@ function PlanWorkspace({
       <section className="planHero">
         <div>
           <p className="eyebrow">Plan</p>
-          <h2>{plan?.name ?? "Build a deterministic marathon plan"}</h2>
+          <h2>{plan?.name ?? "Build a deterministic plan"}</h2>
           <p>{structuredPlanSummary(plan)}</p>
+          {plan?.generator?.status ? <p className="muted">Generator status: {statusText(plan.generator.status)}</p> : null}
+          {generatorWarnings.length ? (
+            <ul className="planWarnings">
+              {generatorWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
         <div className="fieldActions">
           {isEditingPlan ? (
@@ -811,7 +833,6 @@ function PlanWorkspace({
               onClick={() => {
                 setPlanSetupMode("choose");
                 setPlanSource("other_named");
-                if (!placeholderPlans.includes(planVariant)) setPlanVariant(placeholderPlans[0]);
               }}
               type="button"
             >
@@ -828,28 +849,12 @@ function PlanWorkspace({
           </div>
           {planSetupMode === "choose" ? (
             <div className="planBuilder">
-              <span>Off-the-shelf plan</span>
-              <label>
-                <span>Plan</span>
-                <select
-                  value={placeholderPlans.includes(planVariant) ? planVariant : placeholderPlans[0]}
-                  disabled={!isEditingPlan}
-                  onChange={(event) => {
-                    setPlanSource("other_named");
-                    setPlanVariant(event.target.value);
-                  }}
-                >
-                  {placeholderPlans.map((placeholder) => (
-                    <option key={placeholder} value={placeholder}>
-                      {placeholder}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <span>Named plan import is experimental</span>
+              <p className="muted">Use the deterministic builder for the primary plan path.</p>
             </div>
           ) : (
             <div className="planBuilder">
-              <span>Starter marathon</span>
+              <span>Deterministic generator v1</span>
               <label>
                 <span>Start date</span>
                 <input
@@ -862,16 +867,17 @@ function PlanWorkspace({
               </label>
               <div className="planControlGrid">
                 <label>
-                  <span>Current mi/wk</span>
-                  <input
-                    aria-label="Current miles per week"
+                  <span>Goal</span>
+                  <select
+                    aria-label="Plan goal"
                     disabled={!isEditingPlan}
-                    min={0}
-                    onChange={(event) => setStarterCurrentMileage(Number(event.target.value))}
-                    step={0.1}
-                    type="number"
-                    value={starterCurrentMileage}
-                  />
+                    onChange={(event) => setStarterGoalType(event.target.value as TrainingPlanGeneratorGoal)}
+                    value={starterGoalType}
+                  >
+                    <option value="base_builder">Base builder</option>
+                    <option value="half_marathon">Half marathon</option>
+                    <option value="marathon">Marathon</option>
+                  </select>
                 </label>
                 <label>
                   <span>Target mi/wk</span>
@@ -888,31 +894,43 @@ function PlanWorkspace({
               </div>
               <div className="planControlGrid">
                 <label>
-                  <span>Weeks</span>
+                  <span>Horizon weeks</span>
                   <input
                     aria-label="Plan length weeks"
                     disabled={!isEditingPlan}
-                    max={24}
-                    min={8}
+                    max={32}
+                    min={6}
                     onChange={(event) => setStarterPlanWeeks(Number(event.target.value))}
                     type="number"
                     value={starterPlanWeeks}
                   />
                 </label>
                 <label>
-                  <span>Risk tolerance</span>
-                  <select
-                    aria-label="Risk tolerance"
+                  <span>Days / week</span>
+                  <input
+                    aria-label="Running days per week"
                     disabled={!isEditingPlan}
-                    onChange={(event) => setStarterRiskTolerance(event.target.value as MarathonPlanRiskTolerance)}
-                    value={starterRiskTolerance}
-                  >
-                    <option value="low">low</option>
-                    <option value="regular">regular</option>
-                    <option value="high">high</option>
-                  </select>
+                    max={6}
+                    min={3}
+                    onChange={(event) => setStarterDaysPerWeek(Number(event.target.value))}
+                    type="number"
+                    value={starterDaysPerWeek}
+                  />
                 </label>
               </div>
+              <label>
+                <span>Aggression</span>
+                  <select
+                    aria-label="Plan aggression"
+                    disabled={!isEditingPlan}
+                  onChange={(event) => setStarterAggression(event.target.value as TrainingPlanGeneratorAggression)}
+                  value={starterAggression}
+                  >
+                  <option value="conservative">conservative</option>
+                  <option value="balanced">balanced</option>
+                  <option value="aggressive">aggressive</option>
+                  </select>
+              </label>
               <button className="miniButton" disabled={!isEditingPlan} onClick={onGenerate} type="button">
                 Generate plan
               </button>
@@ -1397,6 +1415,11 @@ function groupSummary(groupId: string, status: TrainingStatus) {
 function statusLabel(status: TrainingStatus) {
   if (status === "de-training") return "De-training";
   if (status === "high-risk") return "High risk";
+  return status[0].toUpperCase() + status.slice(1);
+}
+
+function statusText(status: "feasible" | "compromised" | "not_recommended") {
+  if (status === "not_recommended") return "Not recommended";
   return status[0].toUpperCase() + status.slice(1);
 }
 
