@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOptionalEnv, getRequiredEnv } from "./env";
+import { activePlanGuidanceForPrompt } from "./plan-aware-prompt";
 import { contextForPrompt } from "./summary";
 import type { Activity, JsonObject, JsonValue, TrainingContext } from "./types";
 
@@ -150,6 +151,8 @@ function buildUserContent(
   return `PRODUCT DOCTRINE
 
 ${loadDoctrineDocs()}
+
+${activePlanGuidanceForPrompt(runningContext)}
 
 USER SAYS
 
