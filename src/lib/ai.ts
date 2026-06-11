@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getOptionalEnv, getRequiredEnv } from "./env";
-import { activePlanGuidanceForPrompt } from "./plan-aware-prompt";
-import { contextForPrompt } from "./summary";
-import type { Activity, JsonObject, JsonValue, TrainingContext } from "./types";
+import type { ActivePlanSnapshot } from "./active-plan-snapshot.ts";
+import { activePlanGuidanceForPrompt } from "./active-plan-guidance.ts";
+import { getOptionalEnv, getRequiredEnv } from "./env.ts";
+import { computeRunnerTensionSnapshot, runnerTensionSnapshotForPrompt } from "./runner-tension.ts";
+import { contextForPrompt } from "./summary.ts";
+import type { Activity, JsonObject, JsonValue, RunnerTensionModel, RunnerTensionSnapshot, TrainingContext } from "./types.ts";
 
 type OpenAIResponse = {
   output_text?: string;
@@ -22,6 +24,7 @@ type OpenAIRequestBody = JsonObject & {
 export type TrainingTweaksModelCall = {
   model: string;
   runningContext: JsonValue;
+  runnerTensionSnapshot?: RunnerTensionSnapshot;
   openAIRequest: OpenAIRequestBody;
   rawModelResponse: JsonValue;
   answer: string;
@@ -69,11 +72,14 @@ Do not provide medical advice, diagnose injuries, or tell the user to train thro
 export async function askTrainingTweaks(
   activities: Activity[],
   trainingContext: TrainingContext,
-  question: string
+  question: string,
+  runnerTensionModel?: RunnerTensionModel
 ): Promise<TrainingTweaksModelCall> {
   const apiKey = getRequiredEnv("OPENAI_API_KEY");
   const model = getOptionalEnv("OPENAI_MODEL", "gpt-4.1-mini") ?? "gpt-4.1-mini";
-  const runningContext = toJsonValue(contextForPrompt(activities, trainingContext, question));
+  const context = contextForPrompt(activities, trainingContext, question, new Date(), runnerTensionModel);
+  const runningContext = toJsonValue(context);
+  const runnerTensionSnapshot = context.runnerTensionSnapshot;
   const userContent = buildUserContent(trainingContext, question, runningContext);
   const openAIRequest: OpenAIRequestBody = {
     model,
@@ -122,6 +128,7 @@ export async function askTrainingTweaks(
     return {
       model,
       runningContext,
+      runnerTensionSnapshot,
       openAIRequest,
       rawModelResponse: toJsonValue(payload),
       answer: extractText(payload)
@@ -143,16 +150,17 @@ function toJsonValue(value: unknown) {
   return JSON.parse(JSON.stringify(value)) as JsonValue;
 }
 
-function buildUserContent(
+export function buildUserContent(
   trainingContext: TrainingContext,
   question: string,
   runningContext: unknown
 ) {
+  const activePlanGuidance = activePlanGuidanceForPrompt(activePlanSnapshotFromRunningContext(runningContext));
+  const runnerTensionContext = runnerTensionSnapshotForPrompt(runnerTensionSnapshotFromRunningContext(runningContext));
+
   return `PRODUCT DOCTRINE
 
 ${loadDoctrineDocs()}
-
-${activePlanGuidanceForPrompt(runningContext)}
 
 USER SAYS
 
@@ -171,6 +179,12 @@ ${trainingContext.planContext?.trim() || "Not provided"}
 Structured plan:
 ${JSON.stringify(structuredPlanFromRunningContext(runningContext) ?? "Not provided", null, 2)}
 
+Active plan guidance:
+${activePlanGuidance}
+
+Runner tension model:
+${runnerTensionContext}
+
 Goals context:
 ${trainingContext.goalsContext?.trim() || "Not provided"}
 
@@ -185,6 +199,18 @@ ${JSON.stringify(runningContext, null, 2)}`;
 function structuredPlanFromRunningContext(runningContext: unknown) {
   if (!runningContext || typeof runningContext !== "object") return undefined;
   return (runningContext as { structuredTrainingPlan?: unknown }).structuredTrainingPlan;
+}
+
+function activePlanSnapshotFromRunningContext(runningContext: unknown) {
+  if (!runningContext || typeof runningContext !== "object") return undefined;
+  return (runningContext as { activePlanSnapshot?: ActivePlanSnapshot }).activePlanSnapshot;
+}
+
+function runnerTensionSnapshotFromRunningContext(runningContext: unknown) {
+  if (!runningContext || typeof runningContext !== "object") return computeRunnerTensionSnapshot(undefined, new Date(0));
+
+  const snapshot = (runningContext as { runnerTensionSnapshot?: RunnerTensionSnapshot }).runnerTensionSnapshot;
+  return snapshot ?? computeRunnerTensionSnapshot(undefined, new Date(0));
 }
 
 function extractText(payload: OpenAIResponse) {

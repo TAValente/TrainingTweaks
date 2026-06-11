@@ -19,20 +19,20 @@ Scope:
 
 Output structured risk signals for the judgment layer. The LLM should interpret these signals, not invent them from raw activity data.
 
-## 2. Runner Doctrine
+## 2. Runner Tension Model
 
-Add a durable personal doctrine object for the runner.
+Runner Doctrine was the umbrella concept. Runner Tension Model is the concrete v1 implementation for durable tradeoff understanding.
 
 Scope:
 
-- current priority: protect build, stick to plan, push race goal
-- plan respect level
-- risk posture
-- explicit counterbalance notes
-- runner-specific training beliefs or rituals
-- inferred tendencies, treated as hypotheses
+- fixed binary tensions with stable ids and human-readable labels
+- raw evidence events as the source of truth
+- exponential decay with versioned parameters
+- current posture computed on demand from stacked decaying evidence
+- stated position and revealed behavior preserved separately
+- prompt rendering that contextualizes ambiguous tradeoffs without overriding deterministic risk findings
 
-The doctrine should help TrainingTweaks decide how convicted to be when the user's current impulse conflicts with their stated goals.
+The model should help TrainingTweaks decide how convicted to be when the user's current impulse conflicts with their stated goals or revealed patterns. It should never become a permanent personality label.
 
 ## 3. Decision-Improvement Loop
 
@@ -58,7 +58,7 @@ Scope:
 - risk signals
 - recommendation
 - decision framework or rule applied
-- priority/doctrine used
+- runner tension snapshot used
 - intended recommendation direction
 - actual behavior observed from Strava
 - user feedback when available
@@ -79,14 +79,28 @@ Learn whether recommendations are helping without adding heavy user burden.
 Scope:
 
 - one-tap feedback after answers
+- infer question-history hints carefully
 - compare recommendations to subsequent Strava behavior
-- infer directional alignment, not only exact compliance
+- classify actual behavior as exact, directionally aligned, accepted alternative, chose opposite side, ignored, or unknown
+- compare expected versus actual risk exposure
+- store outcome evidence separately from observed behavior evidence
+- surface meaningful tension mismatches to the runner
+- ask the runner to confirm or reject important tension model updates
+- add lightweight chips such as "yes, keep treating it this way" and "no, that's not right"
 - detect whether friction-reduction advice increases execution
 - detect whether repeated advice is ignored or disliked
 - retreat from default friction-reduction advice when it appears annoying or unhelpful
-- make doctrine suggestions only after repeated evidence
+- make tension model suggestions only after repeated evidence
 
 Execution alone is not enough. A run completed after a suggestion may mean the advice worked, but it may also mean the user felt pressured. A workout that differs from the exact recommendation may still show that the advice helped. TrainingTweaks should measure behavioral influence, satisfaction, and repeated preference signals where practical.
+
+Future: Runner Tension Reconciliation:
+
+- trigger occasional check-ins at plan transitions, race completion, stale evidence, or repeated stated-vs-revealed mismatch
+- ask whether the current tension model still matches the runner's go-forward posture
+- let the runner confirm, revise, or retire stale tension assumptions
+- store confirmations as explicit_user evidence with slow decay
+- avoid frequent nagging; default to passive decay unless the mismatch materially affects recommendations
 
 ## 5. Plan Understanding
 

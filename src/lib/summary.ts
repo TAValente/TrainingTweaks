@@ -1,4 +1,5 @@
-import type { Activity, ActivitySummary, FastestEffortSummary, TrainingContext } from "./types";
+import { computeRunnerTensionSnapshot } from "./runner-tension.ts";
+import type { Activity, ActivitySummary, FastestEffortSummary, RunnerTensionModel, TrainingContext } from "./types";
 import { buildActivePlanSnapshot } from "./active-plan-snapshot.ts";
 import { defaultTimeZone, localDateParts } from "./calendar.ts";
 import { buildLoadRiskContext, computeRiskFindings } from "./risk.ts";
@@ -68,7 +69,8 @@ export function contextForPrompt(
   activities: Activity[],
   context: TrainingContext,
   question: string,
-  now = new Date()
+  now = new Date(),
+  runnerTensionModel?: RunnerTensionModel
 ) {
   const timeZone = defaultTimeZone;
   const today = localDateParts(now, timeZone);
@@ -81,6 +83,7 @@ export function contextForPrompt(
   const plannedWorkout = plannedWorkoutExposureFromSnapshot(structuredTrainingPlan);
   const loadRiskContext = buildLoadRiskContext(activities, now, undefined, plannedWorkout);
   const riskFindings = computeRiskFindings({ activities, asOfDate: now, plannedWorkout });
+  const runnerTensionSnapshot = computeRunnerTensionSnapshot(runnerTensionModel, now);
   const recentRuns = activities
     .filter(isRun)
     .sort(byNewestStartDate)
@@ -130,6 +133,7 @@ export function contextForPrompt(
     summary,
     loadRiskContext,
     riskFindings,
+    runnerTensionSnapshot,
     selectedTrainingPlan: {
       source: context.planSource || "unknown",
       variant: context.planVariant || "Not provided"

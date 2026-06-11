@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue, StoredModelRun } from "./types";
+import type { JsonObject, JsonValue, StoredModelRun } from "./types.ts";
 
 const sensitiveKeyPattern = /(api[_-]?key|authorization|access[_-]?token|refresh[_-]?token|password|secret|bearer|cookie)/i;
 const sensitiveValuePatterns = [
