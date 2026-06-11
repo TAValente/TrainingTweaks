@@ -5,6 +5,7 @@ import { defaultTimeZone, localDateParts } from "@/lib/calendar";
 import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
 import { computeRiskFindings } from "@/lib/risk";
+import { buildActivePlanSnapshot } from "@/lib/active-plan-snapshot";
 import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "@/lib/structured-plans";
 import type { NextRequest } from "next/server";
 
@@ -17,16 +18,22 @@ export async function GET(request: NextRequest) {
 
     const data = await getData(user.id);
     const today = localDateParts(new Date(), defaultTimeZone);
+    const summary = buildActivitySummary(data.activities);
     const plannedWorkout = plannedWorkoutExposureFromSnapshot(
       structuredPlanSnapshot(data.context?.structuredPlan, { localDate: today.date })
     );
+    const activePlanSnapshot = buildActivePlanSnapshot(data.context?.structuredPlan, data.activities, {
+      localDate: today.date,
+      completedMilesLast7Days: summary.mileageLast7Days
+    });
     return NextResponse.json({
       user,
       connected: Boolean(data.strava),
       lastRefreshAt: data.lastRefreshAt,
       activities: activitiesForClient(data.activities.slice(0, 20)),
       context: data.context,
-      summary: buildActivitySummary(data.activities),
+      summary,
+      activePlanSnapshot,
       riskFindings: computeRiskFindings({ activities: data.activities, plannedWorkout })
     });
   } catch (error) {

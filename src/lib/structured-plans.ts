@@ -1,4 +1,7 @@
 import type { PlannedWorkoutExposure, StructuredTrainingPlan, TrainingPlanDayOfWeek } from "./types";
+import { localTodayIsoDate, planCalendarPosition, type PlanCalendarPositionStatus } from "./plan-calendar.ts";
+
+type StructuredPlanSnapshotStatus = PlanCalendarPositionStatus | "invalid_plan";
 
 export type StructuredPlanSnapshotOptions = {
   localDate?: string;
@@ -7,13 +10,15 @@ export type StructuredPlanSnapshotOptions = {
 export function structuredPlanSnapshot(plan?: StructuredTrainingPlan, options: StructuredPlanSnapshotOptions = {}) {
   if (!plan) return undefined;
   const calendarPosition = calendarPlanPosition(plan, options);
+  const status: StructuredPlanSnapshotStatus = calendarPosition?.status ?? "invalid_plan";
   const currentWeek = clampWeek(calendarPosition?.weekNumber ?? plan.currentWeek ?? 1, plan.durationWeeks);
   const currentDay = calendarPosition?.dayOfWeek ?? plan.currentDay ?? "monday";
   const week = plan.weeks.find((candidate) => candidate.weekNumber === currentWeek);
-  const today = week?.days.find((day) => day.dayOfWeek === currentDay);
+  const today = status === "in_plan" ? week?.days.find((day) => day.dayOfWeek === currentDay) : undefined;
   const upcoming = upcomingDays(plan, currentWeek, currentDay, 7);
 
   return {
+    status,
     name: plan.name,
     source: plan.source,
     raceDistance: plan.raceDistance,
@@ -55,6 +60,7 @@ export function structuredPlanSummary(plan?: StructuredTrainingPlan) {
 export function plannedWorkoutExposureFromSnapshot(
   snapshot?: ReturnType<typeof structuredPlanSnapshot>
 ): PlannedWorkoutExposure | undefined {
+  if (snapshot?.status !== "in_plan") return undefined;
   const workout = snapshot?.plannedToday;
   if (!workout) return undefined;
   return {
@@ -86,35 +92,13 @@ function clampWeek(value: number, durationWeeks: number) {
 }
 
 function calendarPlanPosition(plan: StructuredTrainingPlan, options: StructuredPlanSnapshotOptions) {
-  if (!plan.startDate) return undefined;
-  const start = parseIsoDate(plan.startDate);
-  if (!start) return undefined;
-  const today = options.localDate ? parseIsoDate(options.localDate) : localToday();
-  if (!today) return undefined;
-  const deltaDays = Math.floor((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-  if (deltaDays < 0) return { weekNumber: 1, dayOfWeek: "monday" as TrainingPlanDayOfWeek };
+  const position = planCalendarPosition(plan.startDate, options.localDate ?? localTodayIsoDate(), plan.durationWeeks);
+  if (!position) return undefined;
   return {
-    weekNumber: clampWeek(Math.floor(deltaDays / 7) + 1, plan.durationWeeks),
-    dayOfWeek: dayOfWeekFromIndex(deltaDays % 7)
+    status: position.status,
+    weekNumber: clampWeek(position.weekNumber, plan.durationWeeks),
+    dayOfWeek: position.dayOfWeek
   };
-}
-
-function parseIsoDate(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return undefined;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function dayOfWeekFromIndex(index: number): TrainingPlanDayOfWeek {
-  return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"][index] as TrainingPlanDayOfWeek;
-}
-
-function localToday() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
 }
 
 function plannedExposureSource(source: StructuredTrainingPlan["source"] | undefined): PlannedWorkoutExposure["source"] {

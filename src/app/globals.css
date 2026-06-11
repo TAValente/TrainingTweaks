@@ -418,6 +418,58 @@ h2 {
   padding: 16px;
 }
 
+.activePlanCard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.activePlanCard header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.activePlanCard h3 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.activePlanGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.activePlanStatus {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  padding: 6px 10px;
+}
+
+.activePlanStatus.on_track {
+  border-color: rgba(15, 118, 110, 0.32);
+  color: var(--accent-dark);
+}
+
+.activePlanStatus.ahead {
+  border-color: rgba(183, 121, 31, 0.42);
+  color: var(--warm);
+}
+
+.activePlanStatus.behind {
+  border-color: #f3b4a8;
+  color: var(--danger);
+}
+
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1383,6 +1435,7 @@ input:disabled {
 
   .reviewToolbar,
   .runHeader,
+  .activePlanCard header,
   .previewHeader,
   .planHero,
   .weekHeader {
@@ -1401,11 +1454,12 @@ input:disabled {
   }
 
   .navActions,
-    .metricLine,
-    .planMetricGrid,
-    .previewMetricGrid,
-    .planControlGrid,
-    .calendarToolbar {
+  .metricLine,
+  .activePlanGrid,
+  .planMetricGrid,
+  .previewMetricGrid,
+  .planControlGrid,
+  .calendarToolbar {
     grid-template-columns: 1fr;
   }
 

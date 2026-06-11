@@ -9,6 +9,7 @@ import {
   refreshTokensIfNeeded
 } from "@/lib/strava";
 import { getData, saveActivities, saveStravaTokens } from "@/lib/store";
+import { buildActivePlanSnapshot } from "@/lib/active-plan-snapshot";
 import { buildActivitySummary } from "@/lib/summary";
 import { computeRiskFindings } from "@/lib/risk";
 import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "@/lib/structured-plans";
@@ -45,9 +46,14 @@ export async function POST(request: NextRequest) {
     activities = await saveActivities(user.id, streamActivities);
   }
   const today = localDateParts(new Date(), defaultTimeZone);
+  const summary = buildActivitySummary(activities);
   const plannedWorkout = plannedWorkoutExposureFromSnapshot(
     structuredPlanSnapshot(data.context?.structuredPlan, { localDate: today.date })
   );
+  const activePlanSnapshot = buildActivePlanSnapshot(data.context?.structuredPlan, activities, {
+    localDate: today.date,
+    completedMilesLast7Days: summary.mileageLast7Days
+  });
 
   return NextResponse.json({
     refreshedAt: new Date().toISOString(),
@@ -57,7 +63,8 @@ export async function POST(request: NextRequest) {
     streamSync: streamSyncSummary,
     totalCount: activities.length,
     activities: activitiesForClient(activities.slice(0, 20)),
-    summary: buildActivitySummary(activities),
+    summary,
+    activePlanSnapshot,
     riskFindings: computeRiskFindings({ activities, plannedWorkout })
   });
 }
