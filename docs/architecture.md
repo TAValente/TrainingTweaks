@@ -191,6 +191,20 @@ It preserves:
 
 Fulfillment is workout-intent-based, not merely calendar-window-based. A long run shifted by an acceptable day can be shifted-but-aligned; a modified run can still be aligned if it stays within the recommendation's exposure bounds or accepted alternative.
 
+### Fulfillment Matching
+
+A deterministic matcher compares stored Recommendation Fulfillment Traces against later Strava activities.
+
+V1 is conservative and intent-based:
+
+- unknown target intent remains unknown
+- ambiguous activity evidence remains unknown
+- shifted-but-aligned workouts are distinct from skipped workouts
+- actual exposure summaries may include activity ids, mileage, duration, intensity, completion time, and notes
+- matching does not create Runner Tension Model evidence
+
+Future work can use reviewed fulfillment results to propose tension evidence updates, but the matcher itself should stay deterministic and non-psychological.
+
 ## Storage Boundaries
 
 ### External Systems

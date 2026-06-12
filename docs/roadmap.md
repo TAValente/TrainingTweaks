@@ -54,6 +54,8 @@ Recommendation Fulfillment Trace is the v1 bridge from recommendation to future 
 
 This is not primarily a calendar observation window. If a recommended long run shifts from Sunday to Monday but preserves the same intent and acceptable exposure, future matching should be able to call it shifted-but-aligned instead of skipped.
 
+Fulfillment Matching v1 deterministically compares stored Recommendation Fulfillment Traces against later Strava activities. It should be conservative and intent-based: classify clear fulfilled, shifted-but-aligned, modified-but-aligned, chose-opposite-side, skipped, unknown, and not-enough-data cases without using the LLM. It should not update the Runner Tension Model yet; future reviewed fulfillment results can propose tension evidence updates.
+
 Scope:
 
 - question
