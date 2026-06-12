@@ -3,9 +3,18 @@ import { join } from "node:path";
 import type { ActivePlanSnapshot } from "./active-plan-snapshot.ts";
 import { activePlanGuidanceForPrompt } from "./active-plan-guidance.ts";
 import { getOptionalEnv, getRequiredEnv } from "./env.ts";
+import { defaultRecommendationFulfillmentTraceForModelRun } from "./recommendation-fulfillment.ts";
 import { computeRunnerTensionSnapshot, runnerTensionSnapshotForPrompt } from "./runner-tension.ts";
 import { contextForPrompt } from "./summary.ts";
-import type { Activity, JsonObject, JsonValue, RunnerTensionModel, RunnerTensionSnapshot, TrainingContext } from "./types.ts";
+import type {
+  Activity,
+  JsonObject,
+  JsonValue,
+  RecommendationFulfillmentTrace,
+  RunnerTensionModel,
+  RunnerTensionSnapshot,
+  TrainingContext
+} from "./types.ts";
 
 type OpenAIResponse = {
   output_text?: string;
@@ -25,6 +34,7 @@ export type TrainingTweaksModelCall = {
   model: string;
   runningContext: JsonValue;
   runnerTensionSnapshot?: RunnerTensionSnapshot;
+  recommendationFulfillmentTrace?: RecommendationFulfillmentTrace;
   openAIRequest: OpenAIRequestBody;
   rawModelResponse: JsonValue;
   answer: string;
@@ -69,6 +79,12 @@ Keep the tone analytical, calm, and direct. No rah-rah coaching, guilt, or false
 
 Do not provide medical advice, diagnose injuries, or tell the user to train through pain.`;
 
+const recommendationFulfillmentGuidance = `RECOMMENDATION FULFILLMENT TRACE GUIDANCE
+
+Recommendations are fulfilled by workout intent, not only by calendar date. If you recommend a Sunday long run and the runner does the same long-run intent on Monday, that may be shifted-but-aligned rather than skipped.
+
+When the call is not a no-brainer, make the target intent, meaningful alternative, and not-aligned behavior clear in natural language. Distinguish fulfilled, shifted-but-aligned, modified-but-aligned, accepted alternative, chose-opposite-side, skipped, and unknown/not-enough-data behavior for future review.`;
+
 export async function askTrainingTweaks(
   activities: Activity[],
   trainingContext: TrainingContext,
@@ -80,6 +96,11 @@ export async function askTrainingTweaks(
   const context = contextForPrompt(activities, trainingContext, question, new Date(), runnerTensionModel);
   const runningContext = toJsonValue(context);
   const runnerTensionSnapshot = context.runnerTensionSnapshot;
+  const recommendationFulfillmentTrace = defaultRecommendationFulfillmentTraceForModelRun({
+    question,
+    runnerTensionSnapshot,
+    runningContext
+  });
   const userContent = buildUserContent(trainingContext, question, runningContext);
   const openAIRequest: OpenAIRequestBody = {
     model,
@@ -129,6 +150,7 @@ export async function askTrainingTweaks(
       model,
       runningContext,
       runnerTensionSnapshot,
+      recommendationFulfillmentTrace,
       openAIRequest,
       rawModelResponse: toJsonValue(payload),
       answer: extractText(payload)
@@ -184,6 +206,8 @@ ${activePlanGuidance}
 
 Runner tension model:
 ${runnerTensionContext}
+
+${recommendationFulfillmentGuidance}
 
 Goals context:
 ${trainingContext.goalsContext?.trim() || "Not provided"}

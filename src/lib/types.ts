@@ -409,6 +409,7 @@ export type StoredModelRun = {
   runningContext?: JsonValue;
   runnerTensionSnapshot?: RunnerTensionSnapshot;
   decisionTrace?: DecisionTrace;
+  recommendationFulfillmentTrace?: RecommendationFulfillmentTrace;
   model?: string;
   openAIRequest?: JsonValue;
   rawModelResponse?: JsonValue | string;
@@ -507,13 +508,16 @@ export type DecisionTensionTrace = {
   rationale?: string;
 };
 
+/**
+ * @deprecated RecommendationFulfillmentTrace supersedes DecisionTrace for expected-vs-actual recommendation review.
+ * Keep this only for compatibility with older stored model runs.
+ */
 export type DecisionTrace = {
   schemaVersion: "1";
   id: string;
   createdAt: string;
   question: string;
   recommendedActionSummary?: string;
-  expectedObservationWindowDays?: number;
   tensionTraces: DecisionTensionTrace[];
   runnerTensionSnapshot: RunnerTensionSnapshot;
   expectedExposure?: unknown;
@@ -525,6 +529,69 @@ export type DecisionTrace = {
     | "accepted_alternative"
     | "chose_opposite_side"
     | "ignored";
+};
+
+export type RecommendationIntent =
+  | "long_run"
+  | "easy_run"
+  | "recovery_run"
+  | "workout"
+  | "rest"
+  | "cross_train"
+  | "delay_decision"
+  | "adjust_week"
+  | "unknown";
+
+export type ScheduleTolerance =
+  | "same_day"
+  | "next_day"
+  | "same_training_week"
+  | "same_microcycle"
+  | "flexible"
+  | "unknown";
+
+export type RecommendedExposure = {
+  targetMiles?: number;
+  minMiles?: number;
+  maxMiles?: number;
+  durationMinutes?: number;
+  minDurationMinutes?: number;
+  maxDurationMinutes?: number;
+  intensity?: "off" | "easy" | "moderate" | "hard";
+  avoidIntensity?: boolean;
+  notes?: string;
+};
+
+export type ActualFulfillment =
+  | "unknown"
+  | "fulfilled"
+  | "shifted_but_aligned"
+  | "modified_but_aligned"
+  | "accepted_alternative"
+  | "chose_opposite_side"
+  | "skipped"
+  | "not_enough_data";
+
+export type RecommendationFulfillmentTrace = {
+  schemaVersion: "1";
+  id: string;
+  createdAt: string;
+  question: string;
+  recommendedActionSummary?: string;
+  targetIntent: RecommendationIntent;
+  expectedExposure?: RecommendedExposure;
+  acceptableSubstitutions?: string[];
+  scheduleTolerance?: {
+    type: ScheduleTolerance;
+    latestDate?: string;
+    notes?: string;
+  };
+  notAlignedIf?: string[];
+  tensionTraces: DecisionTensionTrace[];
+  runnerTensionSnapshot: RunnerTensionSnapshot;
+  expectedRiskContext?: unknown;
+  actualExposure?: unknown;
+  actualFulfillment?: ActualFulfillment;
 };
 
 export type ActivitySummary = {
