@@ -202,6 +202,8 @@ Recommendation Fulfillment Trace is the bridge between a recommendation and late
 
 Fulfillment is based on workout intent, not just a calendar observation window. If TrainingTweaks recommends a Sunday long run and the runner completes the same long-run intent on Monday, that may be shifted-but-aligned rather than skipped. Date tolerance can help future matching, but the core question is whether the intended training outcome happened in an aligned way.
 
+Fulfillment Matching v1 deterministically compares stored Recommendation Fulfillment Traces against later Strava activities. It should be conservative: unknown intent stays unknown, ambiguous activities stay unknown, and shifted-but-aligned workouts should not be treated as skipped. Matching results do not update the Runner Tension Model yet; future work may use reviewed fulfillment results to propose tension evidence updates.
+
 Feedback should combine explicit and inferred signals.
 
 Explicit signals should be lightweight, such as thumbs up or thumbs down on a recommendation. These signals tell TrainingTweaks whether the advice felt useful, respectful, and appropriately calibrated.
