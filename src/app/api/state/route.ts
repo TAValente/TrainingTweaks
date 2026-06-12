@@ -6,6 +6,7 @@ import { getData } from "@/lib/store";
 import { buildActivitySummary } from "@/lib/summary";
 import { computeRiskFindings } from "@/lib/risk";
 import { buildActivePlanSnapshot } from "@/lib/active-plan-snapshot";
+import { computeRunnerTensionSnapshot } from "@/lib/runner-tension";
 import { plannedWorkoutExposureFromSnapshot, structuredPlanSnapshot } from "@/lib/structured-plans";
 import type { NextRequest } from "next/server";
 
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
       context: data.context,
       summary,
       activePlanSnapshot,
+      runnerTensionSnapshot: computeRunnerTensionSnapshot(data.runnerTensionModel),
       riskFindings: computeRiskFindings({ activities: data.activities, plannedWorkout })
     });
   } catch (error) {

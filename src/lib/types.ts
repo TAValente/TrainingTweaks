@@ -407,6 +407,8 @@ export type StoredModelRun = {
   question: string;
   trainingContext: TrainingContext;
   runningContext?: JsonValue;
+  runnerTensionSnapshot?: RunnerTensionSnapshot;
+  decisionTrace?: DecisionTrace;
   model?: string;
   openAIRequest?: JsonValue;
   rawModelResponse?: JsonValue | string;
@@ -429,8 +431,100 @@ export type AppData = {
   strava?: StravaTokenSet;
   activities: Activity[];
   context?: TrainingContext;
+  runnerTensionModel?: RunnerTensionModel;
   modelRuns?: StoredModelRun[];
   lastRefreshAt?: string;
+};
+
+export type RunnerTensionId =
+  | "health_protection_vs_performance_ambition"
+  | "plan_adherence_vs_reality_adaptation"
+  | "consistency_momentum_vs_recovery_rest"
+  | "ambition_identity_vs_current_evidence"
+  | "structure_guidance_vs_flexibility_autonomy"
+  | "short_term_relief_vs_long_term_goal";
+
+export type RunnerTensionSide = "left" | "right";
+
+export type TensionEvidenceSource =
+  | "explicit_user"
+  | "question_history"
+  | "recommendation_trace"
+  | "observed_behavior"
+  | "observed_outcome"
+  | "manual_admin";
+
+export type TensionEvidenceConfidence = "low" | "medium" | "high";
+
+export type TensionEvidenceEvent = {
+  id: string;
+  tensionId: RunnerTensionId;
+  side: RunnerTensionSide;
+  source: TensionEvidenceSource;
+  confidence: TensionEvidenceConfidence;
+  amplitude: number;
+  summary: string;
+  createdAt: string;
+  decayModelVersion: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type RunnerTensionModel = {
+  schemaVersion: "1";
+  evidence: TensionEvidenceEvent[];
+};
+
+export type RunnerTensionPosture = {
+  tensionId: RunnerTensionId;
+  leftLabel: string;
+  rightLabel: string;
+  leftWeight: number;
+  rightWeight: number;
+  net: number;
+  confidence: "none" | "low" | "medium" | "high";
+  leaning: "left" | "right" | "mixed" | "unknown";
+  strongestEvidence: Array<{
+    side: RunnerTensionSide;
+    source: TensionEvidenceSource;
+    effectiveWeight: number;
+    summary: string;
+    createdAt: string;
+  }>;
+};
+
+export type RunnerTensionSnapshot = {
+  schemaVersion: "1";
+  asOf: string;
+  decayModelVersion: string;
+  postures: RunnerTensionPosture[];
+};
+
+export type DecisionTensionTrace = {
+  tensionId: RunnerTensionId;
+  recommendedSide: RunnerTensionSide;
+  alternativeSide?: RunnerTensionSide;
+  discouragedSide?: RunnerTensionSide;
+  rationale?: string;
+};
+
+export type DecisionTrace = {
+  schemaVersion: "1";
+  id: string;
+  createdAt: string;
+  question: string;
+  recommendedActionSummary?: string;
+  expectedObservationWindowDays?: number;
+  tensionTraces: DecisionTensionTrace[];
+  runnerTensionSnapshot: RunnerTensionSnapshot;
+  expectedExposure?: unknown;
+  actualExposure?: unknown;
+  actualAlignment?:
+    | "unknown"
+    | "exact"
+    | "directionally_aligned"
+    | "accepted_alternative"
+    | "chose_opposite_side"
+    | "ignored";
 };
 
 export type ActivitySummary = {

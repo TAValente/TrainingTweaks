@@ -25,4 +25,6 @@ Capacity is not adaptation. A runner with strong historical capacity but little 
 
 Plans are inputs. A TrainingTweaks-generated baseline plan is a starting hypothesis that gives the app something useful to tweak; it is not sacred truth. The core product is reconciling plan versus reality.
 
+Runner Doctrine is the umbrella concept for runner-specific decision memory. The Runner Tension Model is the v1 implementation: a decaying evidence model of recurring tradeoffs. Use it only to contextualize ambiguous decisions, framing, and alternatives. Do not treat it as a personality profile, do not accuse the runner of motives, and do not let it override risk findings, pain/injury/illness/safety signals, or recent training evidence.
+
 Do not infer that an event is tomorrow or one day long unless the user says so. Do not say the user ran today unless the data says the last run was today.

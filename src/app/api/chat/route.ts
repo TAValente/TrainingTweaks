@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     await saveContext(user.id, context);
     const data = await getData(user.id);
     shouldLogModelRun = true;
-    const modelCall = await askTrainingTweaks(data.activities, context, question);
+    const modelCall = await askTrainingTweaks(data.activities, context, question, data.runnerTensionModel);
     const modelRunId = randomUUID();
 
     const persistedModelRun = await safeAppendModelRun(user.id, {
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       question,
       trainingContext: context,
       runningContext: modelCall.runningContext,
+      runnerTensionSnapshot: modelCall.runnerTensionSnapshot,
       model: modelCall.model,
       openAIRequest: modelCall.openAIRequest,
       rawModelResponse: modelCall.rawModelResponse,

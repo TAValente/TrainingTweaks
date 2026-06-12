@@ -178,7 +178,7 @@ If the answer is yes, the product is succeeding.
 
 The user may ask TrainingTweaks at moments when their immediate impulse is distorted by fatigue, dread, ambition, inertia, soreness, or frustration.
 
-TrainingTweaks should compare the current question against the runner's durable doctrine, stated goals, plan style, recent training, and risk signals. When the moment conflicts with the runner's own priorities, the product should gently but clearly counterbalance.
+TrainingTweaks should compare the current question against the runner's durable tension posture, stated goals, plan style, recent training, and risk signals. Runner Doctrine is the umbrella concept; Runner Tension Model is the v1 implementation for recurring binary tradeoffs. When the moment conflicts with the runner's own priorities, the product should gently but clearly counterbalance.
 
 This cuts both ways:
 
@@ -186,7 +186,7 @@ This cuts both ways:
 - If the user is trying to force a workout through meaningful warning signs, protect the build.
 - If the user has chosen an aggressive race posture, name the risk rather than pretending the aggressive choice is risk-free.
 
-Respect the runner as an adult. Counterbalance is not scolding, cheerleading, or paternalism. It is decision support with a memory.
+Respect the runner as an adult. Counterbalance is not scolding, cheerleading, or paternalism. It is decision support with a memory. The tension model should never override deterministic risk findings, pain/injury/illness/safety boundaries, or actual recent training evidence.
 
 ## 17. Reduce Friction Before Deciding
 

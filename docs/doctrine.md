@@ -149,21 +149,28 @@ Examples:
 
 The system should not accumulate data merely because it can. Memory must improve future decisions.
 
-## Runner Doctrine
+## Runner Doctrine and Runner Tension Model
 
-Each runner should have a small personal doctrine that TrainingTweaks can use to interpret ambiguous decisions.
+Runner Doctrine was the umbrella concept for runner-specific decision memory. Runner Tension Model is the concrete v1 implementation.
 
-Runner doctrine may include explicit beliefs:
+The Runner Tension Model is a runner-specific, decaying, evidence-backed model of how the runner tends to resolve recurring training tradeoffs. It is not a plan, static profile, diagnosis, personality label, or generic risk posture. It is a contextual layer for tradeoffs, ambiguity, framing, and recommendation posture.
 
-- what matters most right now: protecting the build, sticking to the plan, or pushing an aggressive race goal
-- how strongly the existing plan should be respected
-- whether the runner tends to seek permission to skip or tends to push through warning signs
-- how much short-term risk the runner is willing to accept
-- training theories or rituals the runner wants honored
+V1 tracks a fixed set of binary tensions:
 
-Runner doctrine may also include implicit tendencies inferred from repeated decisions and outcomes. Inferred doctrine should be treated carefully and surfaced as a hypothesis, not as an accusation or permanent label.
+- health/protection vs performance/ambition
+- plan adherence vs reality adaptation
+- consistency/momentum vs recovery/rest
+- ambition/identity vs current evidence
+- structure/guidance vs flexibility/autonomy
+- short-term relief vs long-term goal
 
-When the runner's current framing conflicts with their durable doctrine, TrainingTweaks should be willing to counterbalance. It should not rubber-stamp avoidance, and it should not enable overreach. The product should respect the runner as knowledgeable while holding them accountable to the priorities they have stated or demonstrated.
+Raw evidence events are the source of truth. Each event records a tension, side, source, confidence, amplitude, summary, creation time, and decay model version. Current posture is computed on demand from stacked decaying evidence, not stored as a permanent label.
+
+Stated position and revealed behavior should be preserved separately conceptually. A mismatch is a core signal to surface and understand, not something to overwrite. For example, a runner may explicitly prioritize finishing healthy while sometimes choosing aggressive training risk; TrainingTweaks should preserve that tension rather than pretending one side cancels the other.
+
+The tension model must not override hard evidence. It does not change mileage math, deterministic risk findings, or clear pain/injury/illness/safety boundaries. It should affect ambiguous tradeoffs, framing, and how strongly to push back or offer alternatives.
+
+When the runner's current framing conflicts with their durable tension posture, TrainingTweaks should be willing to counterbalance. It should not rubber-stamp avoidance, and it should not enable overreach. The runner always decides; the app recommends, explains, and shows meaningful alternatives when appropriate.
 
 ## Friction Before Final Decision
 

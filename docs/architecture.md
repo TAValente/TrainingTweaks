@@ -121,18 +121,22 @@ Examples:
 - training philosophy
 - decision tendencies
 
-### Runner Doctrine
+### Runner Tension Model
 
-The runner's durable decision posture.
+Runner Doctrine was the umbrella concept for runner-specific decision memory. Runner Tension Model is the concrete v1 data model for the runner's durable tradeoff posture.
 
-Examples:
+It stores raw evidence events, not a permanent current label. Each event has a tension id, side, source, confidence, amplitude, summary, creation time, and decay model version. Current posture is computed on demand with exponential decay.
 
-- current priority: protect build, stick to plan, push race goal
-- plan respect level
-- risk posture
-- explicit counterbalance notes
-- runner-specific beliefs or rituals
-- inferred tendencies, treated as hypotheses
+V1 tensions:
+
+- health/protection vs performance/ambition
+- plan adherence vs reality adaptation
+- consistency/momentum vs recovery/rest
+- ambition/identity vs current evidence
+- structure/guidance vs flexibility/autonomy
+- short-term relief vs long-term goal
+
+Stated position and revealed behavior remain conceptually separate. Mismatch is preserved as signal for future confirmation rather than overwritten.
 
 ### Plan Context
 
@@ -156,7 +160,7 @@ Fields:
 - timestamp
 - question
 - context snapshot
-- runner doctrine snapshot
+- runner tension snapshot
 - risk signals
 - recommendation
 - intended recommendation direction
