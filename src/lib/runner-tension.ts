@@ -16,6 +16,8 @@ export const TENSION_DECAY_MODEL_V1 = {
   promptEvidenceThreshold: 0.05,
   sourceHalfLifeDays: {
     explicit_user: 120,
+    manual_seed: 120,
+    scenario_fixture: 120,
     manual_admin: 180,
     observed_behavior: 60,
     observed_outcome: 90,
@@ -24,6 +26,8 @@ export const TENSION_DECAY_MODEL_V1 = {
   },
   sourceWeights: {
     explicit_user: 1,
+    manual_seed: 1,
+    scenario_fixture: 1,
     manual_admin: 1,
     observed_behavior: 0.8,
     observed_outcome: 0.9,

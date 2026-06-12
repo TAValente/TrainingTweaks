@@ -205,6 +205,18 @@ V1 is conservative and intent-based:
 
 Future work can use reviewed fulfillment results to propose tension evidence updates, but the matcher itself should stay deterministic and non-psychological.
 
+### Tension Seed and Scenario Harness
+
+Manual and scenario fixture tension evidence can be seeded for deterministic tests. Seeded evidence must carry explicit provenance such as `manual_seed` or `scenario_fixture`, plus rationale metadata, so it is distinguishable from learned or inferred evidence.
+
+The scenario harness exists to test the audit spine:
+
+```text
+seeded runner tension -> recommendation fulfillment trace -> fulfillment matching result
+```
+
+It should not infer new tension evidence from matching outcomes, parse legacy context fields, or become a production preference engine.
+
 ## Storage Boundaries
 
 ### External Systems

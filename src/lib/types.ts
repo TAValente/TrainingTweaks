@@ -449,6 +449,8 @@ export type RunnerTensionSide = "left" | "right";
 
 export type TensionEvidenceSource =
   | "explicit_user"
+  | "manual_seed"
+  | "scenario_fixture"
   | "question_history"
   | "recommendation_trace"
   | "observed_behavior"
