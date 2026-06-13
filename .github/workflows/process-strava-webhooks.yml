@@ -20,10 +20,12 @@ jobs:
         env:
           APP_URL: ${{ vars.TRAININGTWEAKS_APP_URL }}
           PROCESS_SECRET: ${{ secrets.STRAVA_WEBHOOK_PROCESS_SECRET }}
+          VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           node <<'NODE'
           const appUrl = process.env.APP_URL;
           const secret = process.env.PROCESS_SECRET;
+          const vercelBypassSecret = process.env.VERCEL_BYPASS_SECRET;
 
           if (!appUrl) {
             console.error("Missing TRAININGTWEAKS_APP_URL repository variable.");
@@ -35,11 +37,17 @@ jobs:
             process.exit(1);
           }
 
+          if (!vercelBypassSecret) {
+            console.error("Missing VERCEL_AUTOMATION_BYPASS_SECRET repository secret.");
+            process.exit(1);
+          }
+
           const url = `${appUrl.replace(/\/$/, "")}/api/strava/webhook/process?limit=25`;
 
           const response = await fetch(url, {
             method: "POST",
             headers: {
+              "x-vercel-protection-bypass": vercelBypassSecret,
               "x-trainingtweaks-process-secret": secret
             }
           });
