@@ -225,7 +225,7 @@ export default function Home() {
       }));
       const currentMileageEstimate = estimateCurrentMilesPerWeek(payload.summary);
       setStarterTargetMileage((current) => Math.max(current, currentMileageEstimate));
-      setStatus(`Imported ${payload.importedCount} recent Strava activities.`);
+      setStatus(refreshStatusMessage(payload));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Refresh failed.";
       setError(message);
@@ -1660,6 +1660,31 @@ function activePlanStatusTitle(status: ActivePlanSnapshot["status"]) {
   if (status === "after_plan") return "Plan has ended";
   if (status === "invalid_plan") return "Plan date issue";
   return "No active plan";
+}
+
+function refreshStatusMessage(payload: {
+  importedCount?: number;
+  fetchedCount?: number;
+  activityFetch?: { pageCount?: number; mode?: string };
+  detailSync?: { failedCount?: number; remainingCount?: number };
+  streamSync?: { failedCount?: number; unavailableCount?: number; rateLimited?: boolean; mode?: string };
+}) {
+  const importedCount = payload.importedCount ?? 0;
+  const fetchedCount = payload.fetchedCount ?? importedCount;
+  const pageCount = payload.activityFetch?.pageCount ?? 0;
+  const base =
+    importedCount > 0
+      ? `Imported ${importedCount} new Strava activit${importedCount === 1 ? "y" : "ies"}.`
+      : fetchedCount > 0
+        ? "Checked recent Strava activity; no new activities were added."
+        : "Checked Strava; no recent activities found.";
+  const detailLimited = (payload.detailSync?.failedCount ?? 0) > 0 || (payload.detailSync?.remainingCount ?? 0) > 0;
+  const streamLimited =
+    (payload.streamSync?.failedCount ?? 0) > 0 ||
+    (payload.streamSync?.unavailableCount ?? 0) > 0 ||
+    Boolean(payload.streamSync?.rateLimited);
+  const enrichment = detailLimited || streamLimited ? " Some detail/stream enrichment was limited." : "";
+  return `${base} Refresh checked ${pageCount} page${pageCount === 1 ? "" : "s"}.${enrichment}`;
 }
 
 function activePlanDeviationLabel(status: ActivePlanSnapshot["deviation"]["status"] | undefined) {
