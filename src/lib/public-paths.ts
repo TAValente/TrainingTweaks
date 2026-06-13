@@ -10,6 +10,7 @@ export function isPublicPath(
   env: Partial<Pick<NodeJS.ProcessEnv, "NODE_ENV" | "VERCEL_ENV">> = process.env
 ) {
   if (pathname === "/dev/audit-scenarios") return env.NODE_ENV === "development";
+  if (pathname === "/dev/product-mockups/today") return env.NODE_ENV === "development";
 
   return (
     publicPaths.has(pathname) ||
