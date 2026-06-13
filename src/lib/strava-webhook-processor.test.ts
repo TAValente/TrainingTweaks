@@ -138,7 +138,7 @@ test("processor records compact run metadata after processing", async () => {
   });
 
   await processPendingStravaWebhookEvents({
-    source: "cron",
+    source: "manual",
     now: new Date("2026-06-13T12:00:00.000Z"),
     deps: harness.deps
   });
@@ -147,7 +147,7 @@ test("processor records compact run metadata after processing", async () => {
     {
       runAt: "2026-06-13T12:00:00.000Z",
       summary: {
-        source: "cron",
+        source: "manual",
         attemptedCount: 1,
         processedCount: 1,
         failedCount: 0,

@@ -1,0 +1,55 @@
+name: Process Strava Webhooks
+
+on:
+  schedule:
+    - cron: "2-57/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: process-strava-webhooks
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger webhook processor
+        env:
+          APP_URL: ${{ vars.TRAININGTWEAKS_APP_URL }}
+          PROCESS_SECRET: ${{ secrets.STRAVA_WEBHOOK_PROCESS_SECRET }}
+        run: |
+          node <<'NODE'
+          const appUrl = process.env.APP_URL;
+          const secret = process.env.PROCESS_SECRET;
+
+          if (!appUrl) {
+            console.error("Missing TRAININGTWEAKS_APP_URL repository variable.");
+            process.exit(1);
+          }
+
+          if (!secret) {
+            console.error("Missing STRAVA_WEBHOOK_PROCESS_SECRET repository secret.");
+            process.exit(1);
+          }
+
+          const url = `${appUrl.replace(/\/$/, "")}/api/strava/webhook/process?limit=25`;
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "x-trainingtweaks-process-secret": secret
+            }
+          });
+
+          const text = await response.text();
+
+          if (!response.ok) {
+            console.error(`Webhook processor failed: ${response.status} ${text.slice(0, 1000)}`);
+            process.exit(1);
+          }
+
+          console.log(text);
+          NODE

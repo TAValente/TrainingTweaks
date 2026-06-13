@@ -442,7 +442,7 @@ export type AppData = {
 };
 
 export type StravaWebhookProcessorRunSummary = {
-  source?: "manual" | "cron";
+  source?: "manual";
   attemptedCount: number;
   processedCount: number;
   failedCount: number;

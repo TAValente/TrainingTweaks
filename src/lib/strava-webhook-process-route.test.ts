@@ -1,45 +1,12 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import {
-  authorizeCronStravaWebhookProcess,
   authorizeManualStravaWebhookProcess,
-  isVercelCronRequest,
   parseStravaWebhookProcessLimit,
   stravaWebhookProcessDefaultLimit,
   stravaWebhookProcessMaxLimit
 } from "./strava-webhook-process-route.ts";
-
-test("cron processing rejects ordinary public requests", () => {
-  assert.equal(
-    authorizeCronStravaWebhookProcess({
-      userAgent: "Mozilla/5.0",
-      providedSecret: undefined,
-      expectedSecret: "process-secret"
-    }),
-    false
-  );
-});
-
-test("cron processing accepts Vercel cron signal or configured secret", () => {
-  assert.equal(isVercelCronRequest("vercel-cron/1.0"), true);
-  assert.equal(
-    authorizeCronStravaWebhookProcess({
-      userAgent: "vercel-cron/1.0",
-      providedSecret: undefined,
-      expectedSecret: "process-secret"
-    }),
-    true
-  );
-  assert.equal(
-    authorizeCronStravaWebhookProcess({
-      userAgent: "Mozilla/5.0",
-      providedSecret: "process-secret",
-      expectedSecret: "process-secret"
-    }),
-    true
-  );
-});
 
 test("processor routes use bounded default and explicit safe limits", () => {
   assert.equal(parseStravaWebhookProcessLimit(undefined), stravaWebhookProcessDefaultLimit);
@@ -58,6 +25,13 @@ test("manual processing requires configured matching secret", () => {
   );
   assert.equal(
     authorizeManualStravaWebhookProcess({
+      providedSecret: "wrong-secret",
+      expectedSecret: "process-secret"
+    }),
+    false
+  );
+  assert.equal(
+    authorizeManualStravaWebhookProcess({
       providedSecret: "process-secret",
       expectedSecret: "process-secret"
     }),
@@ -65,15 +39,16 @@ test("manual processing requires configured matching secret", () => {
   );
 });
 
-test("Vercel cron config schedules the Strava webhook processor", async () => {
-  const config = JSON.parse(await readFile("vercel.json", "utf8")) as {
-    crons?: Array<{ path?: string; schedule?: string }>;
-  };
+test("GitHub Actions workflow schedules the protected Strava webhook processor", async () => {
+  const workflow = await readFile(".github/workflows/process-strava-webhooks.yml", "utf8");
 
-  assert.deepEqual(config.crons, [
-    {
-      path: "/api/strava/webhook/process/cron",
-      schedule: "*/5 * * * *"
-    }
-  ]);
+  assert.match(workflow, /cron: "2-57\/5 \* \* \* \*"/);
+  assert.match(workflow, /\/api\/strava\/webhook\/process\?limit=25/);
+  assert.match(workflow, /\$\{\{ secrets\.STRAVA_WEBHOOK_PROCESS_SECRET \}\}/);
+  assert.match(workflow, /\$\{\{ vars\.TRAININGTWEAKS_APP_URL \}\}/);
+  assert.doesNotMatch(workflow, /actions\/checkout/);
+});
+
+test("Vercel cron config is not present", async () => {
+  await assert.rejects(access("vercel.json"));
 });

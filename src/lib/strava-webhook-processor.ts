@@ -30,7 +30,7 @@ export type StravaWebhookProcessingSummary = {
 
 export type StravaWebhookProcessorOptions = {
   limit?: number;
-  source?: "manual" | "cron";
+  source?: "manual";
   now?: Date;
   fetchTimeoutMs?: number;
   deps?: Partial<StravaWebhookProcessorDependencies>;
