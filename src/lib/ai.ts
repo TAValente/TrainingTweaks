@@ -251,16 +251,11 @@ function extractText(payload: OpenAIResponse) {
 }
 
 function loadDoctrineDocs() {
-  const paths = ["docs/runtime-doctrine.md"];
-  const docs = paths
-    .map((path) => {
-      const fullPath = join(process.cwd(), path);
-      if (!existsSync(fullPath)) return "";
-      return readFileSync(fullPath, "utf8").trim();
-    })
-    .filter(Boolean);
-
-  if (docs.length) return docs.join("\n\n---\n\n");
+  const doctrinePath = join(process.cwd(), "docs", "runtime-doctrine.md");
+  if (existsSync(doctrinePath)) {
+    const doctrine = readFileSync(doctrinePath, "utf8").trim();
+    if (doctrine) return doctrine;
+  }
 
   return `TrainingTweaks is a decision product. Make the practical call, give the decisive reason briefly, and ask only for information that would materially change the recommendation.`;
 }
