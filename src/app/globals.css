@@ -2329,6 +2329,36 @@ input:disabled {
 
 }
 
+.todayLiveShell {
+  border-radius: 32px;
+  box-shadow: 0 20px 48px rgba(23, 29, 21, 0.12);
+  grid-template-columns: minmax(0, 430px);
+  min-height: auto;
+  padding: 26px;
+}
+
+.todayLiveShell .todayMockPhone {
+  max-width: 430px;
+}
+
+@media (min-width: 900px) {
+  .todayLiveShell {
+    grid-template-columns: minmax(0, 430px);
+    justify-content: center;
+    padding: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .todayLiveShell {
+    border-radius: 0;
+    box-shadow: none;
+    margin-left: calc(var(--app-padding, 0px) * -1);
+    margin-right: calc(var(--app-padding, 0px) * -1);
+    padding: 0;
+  }
+}
+
 @media (max-width: 980px) {
   .appShell {
     grid-template-columns: 1fr;

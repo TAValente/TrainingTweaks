@@ -11,6 +11,7 @@ import {
   type PlanPreviewState
 } from "@/lib/plan-preview";
 import { buildActivePlanSnapshot, type ActivePlanSnapshot } from "@/lib/active-plan-snapshot";
+import { buildTodayDecisionViewModel, type TodayDecisionViewModel } from "@/lib/today-decision-view-model";
 import { structuredPlanSummary } from "@/lib/structured-plans";
 import type {
   Activity,
@@ -440,6 +441,17 @@ export default function Home() {
     (feedbackNote.trim() !== savedFeedbackNote || feedbackRating !== savedFeedbackRating);
   const dashboard = buildDashboardGroups(state.riskFindings ?? [], state.summary);
   const visibleStructuredPlan = state.context?.structuredPlan;
+  const todayDecision = useMemo(
+    () =>
+      buildTodayDecisionViewModel({
+        activePlanSnapshot: state.activePlanSnapshot,
+        structuredPlan: state.context?.structuredPlan,
+        summary: state.summary,
+        riskFindings: state.riskFindings,
+        lastRefreshAt: state.lastRefreshAt
+      }),
+    [state.activePlanSnapshot, state.context?.structuredPlan, state.summary, state.riskFindings, state.lastRefreshAt]
+  );
 
   return (
     <main className="appShell">
@@ -519,178 +531,7 @@ export default function Home() {
         {error ? <section className="errorLine">{error}</section> : null}
 
         {activeTab === "today" ? (
-          <section className="coreGrid">
-            <section className="workspace">
-              <ActivePlanCard snapshot={state.activePlanSnapshot} />
-              <div className="contextRow">
-            <label className={isEditingGoals ? "" : "locked"}>
-              <span className="fieldHeader">
-                Goals context
-                {isEditingGoals ? (
-                  <span className="fieldActions">
-                    <button
-                      className="miniButton"
-                      type="button"
-                      onClick={() => saveDurableContext("goals")}
-                      disabled={isSavingContext}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="miniButton secondaryMini"
-                      type="button"
-                      onClick={() => {
-                        setGoalsContext(savedGoalsContext);
-                        setIsEditingGoals(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                ) : (
-                  <button className="miniButton" type="button" onClick={() => setIsEditingGoals(true)}>
-                    Edit
-                  </button>
-                )}
-              </span>
-              <textarea
-                value={goalsContext}
-                disabled={!isEditingGoals}
-                onChange={(event) => setGoalsContext(event.target.value)}
-                placeholder="Half marathon on Oct 12, goal is steady aerobic build..."
-              />
-            </label>
-            <label>
-              <span>Current subjective context</span>
-              <textarea
-                value={subjectiveContext}
-                onChange={(event) => setSubjectiveContext(event.target.value)}
-                placeholder="Slept badly, calf 3/10 sore, 45 minutes available, hot outside..."
-              />
-            </label>
-          </div>
-
-          <form className="chat" onSubmit={askQuestion}>
-            <label>
-              <span>Question</span>
-              <textarea
-                className="question"
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                placeholder="I missed three days. What should I run today?"
-              />
-            </label>
-            <button className="button askButton" disabled={isAsking || !question.trim()}>
-              {isAsking ? "Thinking..." : "Ask TrainingTweaks"}
-            </button>
-          </form>
-
-          <article className="answer">
-            {answer ? (
-              <>
-                <Markdownish text={answer} />
-                {answerModelRunId ? (
-                  <section className="feedback">
-                    <div className="feedbackActions">
-                      <button
-                        className={feedbackRating === "positive" ? "miniButton" : "miniButton secondaryMini"}
-                        disabled={isSavingFeedback}
-                        onClick={() => {
-                          setFeedbackRating("positive");
-                          setFeedbackMessage("");
-                        }}
-                        type="button"
-                      >
-                        Helpful
-                      </button>
-                      <button
-                        className={feedbackRating === "negative" ? "miniButton" : "miniButton secondaryMini"}
-                        disabled={isSavingFeedback}
-                        onClick={() => {
-                          setFeedbackRating("negative");
-                          setFeedbackMessage("");
-                        }}
-                        type="button"
-                      >
-                        Not helpful
-                      </button>
-                      <button
-                        className="miniButton"
-                        disabled={isSavingFeedback || !feedbackRating}
-                        onClick={saveFeedback}
-                        type="button"
-                      >
-                        {isSavingFeedback ? "Saving..." : "Save feedback"}
-                      </button>
-                    </div>
-                    <textarea
-                      className="feedbackNote"
-                      onChange={(event) => {
-                        setFeedbackNote(event.target.value);
-                        if (feedbackSavedAt) setFeedbackMessage("");
-                      }}
-                      placeholder="Optional commentary for later review..."
-                      value={feedbackNote}
-                    />
-                    {feedbackMessage || feedbackSavedAt ? (
-                      <p className="feedbackStatus">
-                        {feedbackMessage || "Feedback captured."}
-                        {feedbackSavedAt ? ` Last saved ${new Date(feedbackSavedAt).toLocaleString()}.` : ""}
-                        {savedFeedbackNote ? ` Commentary: "${savedFeedbackNote}"` : ""}
-                        {hasUnsavedFeedback ? " You have unsaved feedback changes." : ""}
-                      </p>
-                    ) : (
-                      <p className="feedbackStatus muted">Choose a rating, add optional commentary, then save feedback.</p>
-                    )}
-                  </section>
-                ) : null}
-              </>
-            ) : (
-              <p className="muted">
-                Answers will prioritize the timing, the practical recommendation, and the key tradeoff.
-              </p>
-            )}
-          </article>
-          </section>
-
-          <aside className="sidebar">
-            <div className="panel summaryPanel">
-              <h2>Recent Training</h2>
-              <dl className="summaryGrid">
-                <Metric label="7 days" value={`${state.summary.mileageLast7Days} mi`} />
-                <Metric label="14 days" value={`${state.summary.mileageLast14Days} mi`} />
-                <Metric label="28 days" value={`${state.summary.mileageLast28Days} mi`} />
-                <Metric label="Days since run" value={state.summary.daysSinceLastRun ?? "n/a"} />
-                <Metric label="Long run 14d" value={`${state.summary.longestRunLast14DaysMiles} mi`} />
-                <Metric label="Run count 14d" value={state.summary.runCountLast14Days} />
-              </dl>
-              {state.lastRefreshAt ? (
-                <p className="muted">Last refresh {new Date(state.lastRefreshAt).toLocaleString()}</p>
-              ) : (
-                <p className="muted">No Strava refresh yet.</p>
-              )}
-            </div>
-
-            <div className="panel">
-              <h2>Latest Runs</h2>
-              <div className="activityList">
-                {runs.length === 0 ? (
-                  <p className="muted">Runs will appear here after a Strava refresh.</p>
-                ) : (
-                  runs.slice(0, 8).map((activity) => (
-                    <div className="activity" key={activity.providerActivityId}>
-                      <div>
-                        <strong>{activity.name ?? activity.sportType}</strong>
-                        <span>{activity.startDate.slice(0, 10)}</span>
-                      </div>
-                      <b>{formatMiles(activity.distanceMeters)}</b>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </aside>
-        </section>
+          <TodayDecisionView viewModel={todayDecision} />
         ) : (
           <PlanWorkspace
             activities={state.activities}
@@ -747,6 +588,211 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+type TweakId = "great" | "tired" | "sore" | "pain" | "schedule" | "behind";
+
+const todayTweakChips: Array<{ id: TweakId; label: string }> = [
+  { id: "great", label: "Feeling great" },
+  { id: "tired", label: "Low energy" },
+  { id: "sore", label: "Sore" },
+  { id: "pain", label: "Pain" },
+  { id: "schedule", label: "Schedule tight" },
+  { id: "behind", label: "Behind plan" }
+];
+
+function TodayDecisionView({ viewModel }: { viewModel: TodayDecisionViewModel }) {
+  const [isWhyOpen, setIsWhyOpen] = useState(false);
+  const [selectedTweak, setSelectedTweak] = useState<TweakId | "">("");
+  const heroVariant = viewModel.receipt.items.some((item) => item.tone === "risk")
+    ? "strava-error"
+    : viewModel.receipt.items.some((item) => item.tone === "caution")
+      ? "schedule"
+      : "default";
+  const evidence = [
+    `Assignment: ${viewModel.assignment.distance ?? viewModel.assignment.title}`,
+    viewModel.assignment.intensity ? `intensity ${viewModel.assignment.intensity}` : undefined,
+    `source ${viewModel.assignment.source}`
+  ]
+    .filter(Boolean)
+    .join(" / ");
+
+  return (
+    <section className="todayMockShell todayLiveShell" aria-label="TrainingTweaks Today">
+      <section className="todayMockPhone" aria-label="TrainingTweaks Today decision">
+        <header className="todayMockHeader">
+          <div>
+            <p>Good morning</p>
+            <strong>TrainingTweaks</strong>
+          </div>
+          <span>{viewModel.freshness}</span>
+        </header>
+
+        <article
+          className={`todayMockHero ${heroVariant}`}
+          onClick={() => setIsWhyOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setIsWhyOpen(true);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="todayMockHeroImage" aria-hidden="true" />
+          <div className="todayMockTapHint">
+            <span>Why this call?</span>
+          </div>
+          <div className="todayMockHeroIcon" aria-hidden="true">
+            <TodayHeroIcon variant={heroVariant} />
+          </div>
+          <p>Today's path</p>
+          <h2>{viewModel.headline}</h2>
+          {viewModel.subheadline ? <p className="todayMockHeroCopy">{viewModel.subheadline}</p> : null}
+          <div className="todayMockReceipt" aria-label="Recommendation reasoning receipt">
+            <strong>{viewModel.receipt.primary}</strong>
+            <span>{viewModel.rationale[0] ?? "Current context is incomplete."}</span>
+          </div>
+          <div className="todayMockEvidence">{evidence}</div>
+          <div className="todayMockSwipe" aria-label="Refresh affordance">
+            <i aria-hidden="true" />
+            <span>Refresh stays on the existing Strava path</span>
+          </div>
+        </article>
+
+        {isWhyOpen ? (
+          <section className="todayMockWhySheet" aria-label="Why this call preview">
+            <header>
+              <div>
+                <h3>Why this call?</h3>
+                <p>Deterministic plan, build, and risk context for today's default view.</p>
+              </div>
+              <button onClick={() => setIsWhyOpen(false)} type="button">
+                Close
+              </button>
+            </header>
+            <div className="todayMockWhyList">
+              {viewModel.receipt.items.map((item) => (
+                <div key={item.label}>
+                  <strong>{item.label}</strong>
+                  <span>{item.value}</span>
+                </div>
+              ))}
+              {viewModel.rationale.map((item, index) => (
+                <div key={`${index}-${item}`}>
+                  <strong>{index === 0 ? "Rationale" : "Context"}</strong>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="todayMockTweakCard">
+          <div className="todayMockSectionHeader">
+            <h3>Considering a tweak today?</h3>
+            <p>{selectedTweak ? "Noted locally. Decision logic is unchanged for now." : "No tweak needed? Just run the plan."}</p>
+          </div>
+          <div className="todayMockChips" aria-label="Optional tweak choices">
+            {todayTweakChips.map((chip) => (
+              <button
+                className={selectedTweak === chip.id ? "active" : ""}
+                key={chip.id}
+                onClick={() => setSelectedTweak((current) => (current === chip.id ? "" : chip.id))}
+                type="button"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="todayMockWeek">
+          <div className="todayMockSectionHeader">
+            <h3>This week's path</h3>
+            <p>{viewModel.confidence ? `${viewModel.confidence} confidence` : "context limited"}</p>
+          </div>
+          <div className="todayMockWeekPath" aria-label="Week outlook">
+            {viewModel.weekPath.map((item) => (
+              <div className={weekPathClass(item)} key={item.date}>
+                <span />
+                <small>{weekPathDateLabel(item.date, item.status)}</small>
+                <strong>{item.label}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <nav className="todayMockBottomNav" aria-label="Main">
+          <a className="active" href="/">
+            Today
+          </a>
+          <a href="/">
+            Schedule
+          </a>
+          <a href="/">
+            Progress
+          </a>
+        </nav>
+      </section>
+    </section>
+  );
+}
+
+function TodayHeroIcon({ variant }: { variant: "default" | "schedule" | "strava-error" }) {
+  if (variant === "strava-error") {
+    return (
+      <svg viewBox="0 0 44 44" role="img">
+        <path
+          d="M22 8.5 37 34.5H7L22 8.5Z"
+          fill="none"
+          stroke="currentColor"
+          strokeLinejoin="round"
+          strokeWidth="3"
+        />
+        <path d="M22 17.5V25.5" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+        <circle cx="22" cy="30.5" fill="currentColor" r="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 44 44" role="img">
+      <path
+        d="M11 25.5c4.7 1.6 9.3 1.2 13.9-1.1 2.4-1.2 4.6-1.6 6.6-1.2 1.4.3 2.5 1.2 3.1 2.5l.8 1.8c.4.9-.2 2-1.2 2.1l-17.7 2.2c-2.9.4-5.7-.8-7.5-3.1l-1.1-1.4c-.7-.9.1-2.2 1.2-1.9l1.9.1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.6"
+      />
+      <path
+        d="M16.7 24.9c1.6-3.2 2.5-6.2 2.7-9.1M19.5 21.2l6.1 2.8M22 18.1l5.9 2.7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+      <path d="M13.5 32.3h19" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+    </svg>
+  );
+}
+
+function weekPathClass(item: TodayDecisionViewModel["weekPath"][number]) {
+  if (item.status === "today") return "active";
+  if (item.status === "done") return "rest";
+  if (item.label.toLowerCase().includes("long")) return "long";
+  if (item.status === "unknown") return "rest";
+  return "easy";
+}
+
+function weekPathDateLabel(date: string, status: TodayDecisionViewModel["weekPath"][number]["status"]) {
+  if (status === "today") return "Today";
+  const parsed = parseIsoDate(date);
+  if (!parsed) return date.slice(5);
+  return parsed.toLocaleDateString(undefined, { weekday: "short" });
 }
 
 function ActivePlanCard({ snapshot }: { snapshot?: ActivePlanSnapshot }) {
