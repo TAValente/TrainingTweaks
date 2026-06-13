@@ -1899,6 +1899,20 @@ input:disabled {
   margin-top: auto;
 }
 
+.todayMockSwipeButton {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.todayMockSwipeButton:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .todayMockSwipe i {
   border: 1px solid rgba(45, 95, 52, 0.22);
   border-radius: 999px;

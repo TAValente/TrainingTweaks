@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fetchDetailedRunActivities, fetchRecentStravaActivities, fetchRunActivityStreams } from "./strava.ts";
-import { stravaRefreshConfig, stravaRefreshWindow } from "./strava-refresh.ts";
+import {
+  stravaRefreshConfig,
+  stravaRefreshWindow,
+  stravaTodayCheckConfig,
+  stravaTodayCheckContract,
+  stravaTodayCheckWindow,
+  todayCheckStatusCopy
+} from "./strava-refresh.ts";
 import type { Activity } from "./types.ts";
 
 test("lastRefreshAt uses incremental window with overlap days", () => {
@@ -146,6 +153,49 @@ test("no new activities returns an empty bounded fetch summary", async () => {
   assert.equal(result.activities.length, 0);
   assert.equal(result.pageCount, 1);
   assert.equal(result.pageLimit, 3);
+});
+
+test("fast today check uses one activity page and short timeout defaults", () => {
+  assert.deepEqual(stravaTodayCheckConfig({}), {
+    overlapDays: 1,
+    pageLimit: 1,
+    perPage: 50,
+    fetchTimeoutMs: 4000
+  });
+});
+
+test("fast today check contract disables detail and stream sync", () => {
+  assert.deepEqual(stravaTodayCheckContract({}), {
+    activityFetch: {
+      pageLimit: 1,
+      perPage: 50,
+      timeoutMs: 4000
+    },
+    detailSync: false,
+    streamSync: false
+  });
+});
+
+test("fast today window stays bounded to today-ish when last refresh is old", () => {
+  const window = stravaTodayCheckWindow({
+    localDate: "2026-06-13",
+    lastRefreshAt: "2026-01-01T12:00:00.000Z",
+    config: { overlapDays: 1 }
+  });
+
+  assert.equal(window.afterIso, new Date(2026, 5, 12).toISOString());
+});
+
+test("today status copy does not imply a run was found when none was saved", () => {
+  const copy = todayCheckStatusCopy("no_new_activity");
+
+  assert.equal(copy, "No new run found.");
+  assert.doesNotMatch(copy, /updated|imported|saved/i);
+});
+
+test("today status copy preserves safe unchanged state for slow Strava", () => {
+  assert.equal(todayCheckStatusCopy("using_last_sync"), "Using last sync; Strava was slow.");
+  assert.equal(todayCheckStatusCopy("error"), "Couldn't reach Strava. Plan unchanged.");
 });
 
 function jsonResponse(body: unknown, status = 200) {
