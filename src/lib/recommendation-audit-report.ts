@@ -156,11 +156,11 @@ function exposureSummary(trace: RecommendationFulfillmentTrace) {
   const parts = [
     exposure.targetMiles !== undefined ? `${exposure.targetMiles} mi target` : undefined,
     exposure.minMiles !== undefined || exposure.maxMiles !== undefined
-      ? `${exposure.minMiles ?? "?"}-${exposure.maxMiles ?? "?"} mi`
+      ? rangeSummary(exposure.minMiles, exposure.maxMiles, "mi")
       : undefined,
     exposure.durationMinutes !== undefined ? `${exposure.durationMinutes} min target` : undefined,
     exposure.minDurationMinutes !== undefined || exposure.maxDurationMinutes !== undefined
-      ? `${exposure.minDurationMinutes ?? "?"}-${exposure.maxDurationMinutes ?? "?"} min`
+      ? rangeSummary(exposure.minDurationMinutes, exposure.maxDurationMinutes, "min")
       : undefined,
     exposure.intensity ? `${exposure.intensity} intensity` : undefined,
     exposure.avoidIntensity ? "avoid intensity" : undefined,
@@ -168,6 +168,13 @@ function exposureSummary(trace: RecommendationFulfillmentTrace) {
   ].filter(Boolean);
 
   return parts.length ? parts.join("; ") : "Expected exposure was present but did not include concrete fields.";
+}
+
+function rangeSummary(min: number | undefined, max: number | undefined, unit: string) {
+  if (min !== undefined && max !== undefined) return `${min}-${max} ${unit}`;
+  if (min !== undefined) return `at least ${min} ${unit}`;
+  if (max !== undefined) return `up to ${max} ${unit}`;
+  return undefined;
 }
 
 function scheduleToleranceSummary(trace: RecommendationFulfillmentTrace) {
@@ -200,7 +207,7 @@ function evidenceLines(trace: RecommendationFulfillmentTrace, match: Fulfillment
   const lines = [
     `Trace target intent: ${trace.targetIntent}.`,
     `Matcher confidence: ${match.confidence}.`,
-    `Matcher rationale: ${match.rationale}.`
+    `Matcher rationale: ${sentence(match.rationale)}`
   ];
 
   if (trace.notAlignedIf?.length) lines.push(`Not aligned if: ${trace.notAlignedIf.join("; ")}.`);
@@ -212,6 +219,10 @@ function evidenceLines(trace: RecommendationFulfillmentTrace, match: Fulfillment
   }
 
   return lines;
+}
+
+function sentence(value: string) {
+  return /[.!?]$/.test(value) ? value : `${value}.`;
 }
 
 function caveatsFor(trace: RecommendationFulfillmentTrace, match: FulfillmentMatchResult) {
