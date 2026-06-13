@@ -42,12 +42,13 @@ jobs:
             process.exit(1);
           }
 
-          const url = `${appUrl.replace(/\/$/, "")}/api/strava/webhook/process?limit=25`;
+          const url = new URL("/api/strava/webhook/process", appUrl.replace(/\/$/, ""));
+          url.searchParams.set("limit", "25");
+          url.searchParams.set("x-vercel-protection-bypass", vercelBypassSecret);
 
           const response = await fetch(url, {
             method: "POST",
             headers: {
-              "x-vercel-protection-bypass": vercelBypassSecret,
               "x-trainingtweaks-process-secret": secret
             }
           });
