@@ -217,6 +217,12 @@ seeded runner tension -> recommendation fulfillment trace -> fulfillment matchin
 
 It should not infer new tension evidence from matching outcomes, parse legacy context fields, or become a production preference engine.
 
+### Recommendation Audit Report
+
+A deterministic, human-readable report can summarize a recommendation fulfillment trace and matching result for review. It answers what was recommended, what was expected, which runner tensions were considered, what activity was matched, how fulfillment was classified, and what caveats remain.
+
+The report is an audit artifact only. It must not create Runner Tension Model evidence, infer durable preferences, or perform automatic learning.
+
 ## Storage Boundaries
 
 ### External Systems
