@@ -45,7 +45,10 @@ test("GitHub Actions workflow schedules the protected Strava webhook processor",
   assert.match(workflow, /cron: "2-57\/5 \* \* \* \*"/);
   assert.match(workflow, /\/api\/strava\/webhook\/process\?limit=25/);
   assert.match(workflow, /\$\{\{ secrets\.STRAVA_WEBHOOK_PROCESS_SECRET \}\}/);
+  assert.match(workflow, /\$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}/);
   assert.match(workflow, /\$\{\{ vars\.TRAININGTWEAKS_APP_URL \}\}/);
+  assert.match(workflow, /"x-vercel-protection-bypass": vercelBypassSecret/);
+  assert.match(workflow, /"x-trainingtweaks-process-secret": secret/);
   assert.doesNotMatch(workflow, /actions\/checkout/);
 });
 
