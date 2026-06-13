@@ -460,6 +460,13 @@ export type StravaWebhookEvent = {
   status: StravaWebhookEventStatus;
   attempts: number;
   eventKind: StravaWebhookEventKind;
+  processedAt?: string;
+  failedAt?: string;
+  ignoredAt?: string;
+  failureReason?: string;
+  ignoredReason?: string;
+  matchedUserId?: string;
+  lastAttemptAt?: string;
 };
 
 export type RunnerTensionId =

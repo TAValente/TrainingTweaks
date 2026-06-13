@@ -207,6 +207,28 @@ export async function fetchRecentStravaActivities(
   };
 }
 
+export async function fetchStravaActivityById(
+  accessToken: string,
+  activityId: number | string,
+  options: StravaFetchOptions = {}
+): Promise<Activity> {
+  const response = await stravaFetch(
+    "activity detail fetch",
+    `https://www.strava.com/api/v3/activities/${activityId}?include_all_efforts=false`,
+    {
+      headers: { authorization: `Bearer ${accessToken}` },
+      cache: "no-store"
+    },
+    options
+  );
+
+  if (!response.ok) {
+    throw new Error(`Strava activity fetch failed: ${response.status} ${await response.text()}`);
+  }
+
+  return normalizeStravaActivity((await response.json()) as StravaActivity);
+}
+
 export async function fetchDetailedRunActivities(
   accessToken: string,
   activities: Activity[],
