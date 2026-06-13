@@ -1761,44 +1761,38 @@ input:disabled {
   width: 6px;
 }
 
-.todayMockRouteIcon {
+.todayMockHeroIcon {
   background: rgba(224, 233, 205, 0.86);
   border-radius: 999px;
+  color: #143523;
   height: 44px;
-  position: relative;
+  display: grid;
+  place-items: center;
   width: 44px;
 }
 
-.todayMockRouteIcon span {
-  background: #143523;
-  border-radius: 999px;
-  height: 7px;
-  position: absolute;
-  width: 7px;
+.todayMockHeroIcon svg {
+  display: block;
+  height: 28px;
+  width: 28px;
 }
 
-.todayMockRouteIcon span:first-child {
-  left: 12px;
-  position: absolute;
-  top: 27px;
+.todayMockHero.no-run .todayMockHeroIcon {
+  background: #fff3d8;
+  border: 1px solid rgba(183, 121, 31, 0.26);
+  color: #b7791f;
 }
 
-.todayMockRouteIcon span:last-child {
-  left: 28px;
-  top: 11px;
+.todayMockHero.strava-error .todayMockHeroIcon {
+  background: #ffe7e2;
+  border: 1px solid rgba(180, 35, 24, 0.24);
+  color: #b42318;
 }
 
-.todayMockRouteIcon i {
-  border: 2px solid #143523;
-  border-bottom: 0;
-  border-right: 0;
-  border-radius: 14px 0 0 0;
-  height: 18px;
-  left: 15px;
-  position: absolute;
-  top: 15px;
-  transform: rotate(14deg);
-  width: 18px;
+.todayMockHero.no-run .todayMockHeroIcon svg,
+.todayMockHero.strava-error .todayMockHeroIcon svg {
+  height: 26px;
+  width: 26px;
 }
 
 .todayMockHero > p:first-of-type {
@@ -2063,7 +2057,7 @@ input:disabled {
 
 .todayMockWeekPath {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   padding-top: 4px;
   position: relative;
 }
@@ -2073,17 +2067,17 @@ input:disabled {
     linear-gradient(90deg, rgba(43, 108, 61, 0.92), rgba(120, 149, 93, 0.76), rgba(190, 133, 67, 0.82));
   border-radius: 999px;
   content: "";
-  height: 3px;
-  left: 14%;
+  height: 2px;
+  left: 7%;
   opacity: 0.82;
   position: absolute;
-  right: 14%;
-  top: 21px;
+  right: 7%;
+  top: 17px;
 }
 
 .todayMockWeekPath div {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   justify-items: center;
   min-width: 0;
   position: relative;
@@ -2094,8 +2088,8 @@ input:disabled {
   border: 2px solid #2b6c3d;
   border-radius: 999px;
   box-shadow: 0 6px 14px rgba(20, 53, 35, 0.12);
-  height: 36px;
-  width: 36px;
+  height: 28px;
+  width: 28px;
 }
 
 .todayMockWeekPath .active span {
@@ -2108,9 +2102,9 @@ input:disabled {
   border-radius: 999px;
   content: "";
   display: block;
-  height: 9px;
-  margin: 11px auto 0;
-  width: 9px;
+  height: 7px;
+  margin: 8px auto 0;
+  width: 7px;
 }
 
 .todayMockWeekPath .rest span {
@@ -2125,15 +2119,23 @@ input:disabled {
   background: rgba(224, 225, 202, 0.72);
   border-radius: 999px;
   color: rgba(33, 38, 30, 0.58);
-  font-size: 0.62rem;
+  font-size: 0.52rem;
   font-weight: 900;
-  padding: 3px 7px;
+  max-width: 46px;
+  overflow: hidden;
+  padding: 3px 5px;
   text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .todayMockWeekPath strong {
   color: #182d20;
-  font-size: 0.98rem;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  max-width: 48px;
+  min-height: 1.55rem;
+  text-align: center;
 }
 
 .todayMockChips {

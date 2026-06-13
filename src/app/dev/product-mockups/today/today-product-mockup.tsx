@@ -151,8 +151,12 @@ const scenarioTabs: MockScenarioId[] = [
 
 const weekPath = [
   { day: "Today", call: "4 easy", state: "active" },
-  { day: "Tomorrow", call: "Rest", state: "rest" },
-  { day: "Saturday", call: "8 long", state: "long" }
+  { day: "Thu", call: "Rest", state: "rest" },
+  { day: "Fri", call: "3 easy", state: "easy" },
+  { day: "Sat", call: "8 long", state: "long" },
+  { day: "Sun", call: "Rest", state: "rest" },
+  { day: "Mon", call: "4 easy", state: "easy" },
+  { day: "Tue", call: "5 easy", state: "easy" }
 ];
 
 export function TodayProductMockup({ initialState = "default" }: { initialState?: MockScenarioId }) {
@@ -241,10 +245,8 @@ export function TodayProductMockup({ initialState = "default" }: { initialState?
           <div className="todayMockTapHint">
             <span>{scenario.tapHint}</span>
           </div>
-          <div className="todayMockRouteIcon" aria-hidden="true">
-            <span />
-            <i />
-            <span />
+          <div className="todayMockHeroIcon" aria-hidden="true">
+            <HeroIcon scenarioId={scenarioId} />
           </div>
           <p>{scenario.status}</p>
           <h2>{scenario.recommendation}</h2>
@@ -349,5 +351,45 @@ function isMockScenarioId(value: string | null): value is MockScenarioId {
     value === "refreshed" ||
     value === "no-run" ||
     value === "strava-error"
+  );
+}
+
+function HeroIcon({ scenarioId }: { scenarioId: MockScenarioId }) {
+  if (scenarioId === "no-run" || scenarioId === "strava-error") {
+    return (
+      <svg viewBox="0 0 44 44" role="img">
+        <path
+          d="M22 8.5 37 34.5H7L22 8.5Z"
+          fill="none"
+          stroke="currentColor"
+          strokeLinejoin="round"
+          strokeWidth="3"
+        />
+        <path d="M22 17.5V25.5" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+        <circle cx="22" cy="30.5" fill="currentColor" r="1.8" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 44 44" role="img">
+      <path
+        d="M11 25.5c4.7 1.6 9.3 1.2 13.9-1.1 2.4-1.2 4.6-1.6 6.6-1.2 1.4.3 2.5 1.2 3.1 2.5l.8 1.8c.4.9-.2 2-1.2 2.1l-17.7 2.2c-2.9.4-5.7-.8-7.5-3.1l-1.1-1.4c-.7-.9.1-2.2 1.2-1.9l1.9.1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.6"
+      />
+      <path
+        d="M16.7 24.9c1.6-3.2 2.5-6.2 2.7-9.1M19.5 21.2l6.1 2.8M22 18.1l5.9 2.7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.2"
+      />
+      <path d="M13.5 32.3h19" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
+    </svg>
   );
 }
