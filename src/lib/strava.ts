@@ -5,8 +5,10 @@ import type {
   BestEffort,
   StravaStreamType,
   StravaTokenSet
-} from "./types";
-import { getOptionalEnv, getRequiredEnv } from "./env";
+} from "./types.ts";
+import { getOptionalEnv, getRequiredEnv } from "./env.ts";
+
+type FetchImpl = typeof fetch;
 
 type StravaActivity = {
   id: number;
@@ -56,6 +58,33 @@ export type StravaStreamSyncResult = {
   mode: StravaStreamSyncMode;
 };
 
+export type StravaActivityFetchResult = {
+  activities: Activity[];
+  after: number;
+  pageLimit: number;
+  pageCount: number;
+  perPage: number;
+};
+
+export type StravaDetailSyncResult = {
+  activities: Activity[];
+  attemptedCount: number;
+  syncedCount: number;
+  failedCount: number;
+  remainingCount: number;
+};
+
+type StravaFetchOptions = {
+  timeoutMs?: number;
+  fetchImpl?: FetchImpl;
+};
+
+type StravaActivityFetchOptions = StravaFetchOptions & {
+  after?: number;
+  pageLimit?: number;
+  perPage?: number;
+};
+
 type StravaTokenResponse = {
   access_token: string;
   refresh_token: string;
@@ -94,8 +123,8 @@ export function getStravaAuthorizationUrl() {
   return `https://www.strava.com/oauth/authorize?${params.toString()}`;
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<StravaTokenSet> {
-  const response = await fetch("https://www.strava.com/oauth/token", {
+export async function exchangeCodeForTokens(code: string, options: StravaFetchOptions = {}): Promise<StravaTokenSet> {
+  const response = await stravaFetch("token exchange", "https://www.strava.com/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -104,7 +133,7 @@ export async function exchangeCodeForTokens(code: string): Promise<StravaTokenSe
       code,
       grant_type: "authorization_code"
     })
-  });
+  }, options);
 
   if (!response.ok) {
     throw new Error(`Strava token exchange failed: ${response.status} ${await response.text()}`);
@@ -114,11 +143,11 @@ export async function exchangeCodeForTokens(code: string): Promise<StravaTokenSe
   return mapTokenResponse(tokens);
 }
 
-export async function refreshTokensIfNeeded(tokens: StravaTokenSet): Promise<StravaTokenSet> {
+export async function refreshTokensIfNeeded(tokens: StravaTokenSet, options: StravaFetchOptions = {}): Promise<StravaTokenSet> {
   const expiresSoon = tokens.expiresAt <= Math.floor(Date.now() / 1000) + 300;
   if (!expiresSoon) return tokens;
 
-  const response = await fetch("https://www.strava.com/oauth/token", {
+  const response = await stravaFetch("token refresh", "https://www.strava.com/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -127,7 +156,7 @@ export async function refreshTokensIfNeeded(tokens: StravaTokenSet): Promise<Str
       refresh_token: tokens.refreshToken,
       grant_type: "refresh_token"
     })
-  });
+  }, options);
 
   if (!response.ok) {
     throw new Error(`Strava token refresh failed: ${response.status} ${await response.text()}`);
@@ -137,40 +166,54 @@ export async function refreshTokensIfNeeded(tokens: StravaTokenSet): Promise<Str
   return { ...refreshed, athleteId: tokens.athleteId ?? refreshed.athleteId };
 }
 
-export async function fetchRecentStravaActivities(accessToken: string) {
-  const fiveYearsAgo = Math.floor((Date.now() - 1825 * 24 * 60 * 60 * 1000) / 1000);
+export async function fetchRecentStravaActivities(
+  accessToken: string,
+  options: StravaActivityFetchOptions = {}
+): Promise<StravaActivityFetchResult> {
+  const after = options.after ?? Math.floor((Date.now() - 180 * 24 * 60 * 60 * 1000) / 1000);
+  const pageLimit = positiveInteger(options.pageLimit, 3);
+  const perPage = positiveInteger(options.perPage, 200);
   const activities: Activity[] = [];
+  let pageCount = 0;
 
-  for (let page = 1; page <= 10; page += 1) {
+  for (let page = 1; page <= pageLimit; page += 1) {
     const params = new URLSearchParams({
-      after: String(fiveYearsAgo),
+      after: String(after),
       page: String(page),
-      per_page: "200"
+      per_page: String(perPage)
     });
 
-    const response = await fetch(`https://www.strava.com/api/v3/athlete/activities?${params}`, {
+    const response = await stravaFetch("activity list fetch", `https://www.strava.com/api/v3/athlete/activities?${params}`, {
       headers: { authorization: `Bearer ${accessToken}` },
       cache: "no-store"
-    });
+    }, options);
 
     if (!response.ok) {
       throw new Error(`Strava activity refresh failed: ${response.status} ${await response.text()}`);
     }
 
     const pageActivities = (await response.json()) as StravaActivity[];
+    pageCount += 1;
     activities.push(...pageActivities.map(normalizeStravaActivity));
-    if (pageActivities.length < 200) break;
+    if (pageActivities.length < perPage) break;
   }
 
-  return activities;
+  return {
+    activities,
+    after,
+    pageLimit,
+    pageCount,
+    perPage
+  };
 }
 
 export async function fetchDetailedRunActivities(
   accessToken: string,
   activities: Activity[],
-  existingActivities: Activity[]
-) {
-  const detailLimit = Number(getOptionalEnv("STRAVA_DETAIL_SYNC_LIMIT", "30"));
+  existingActivities: Activity[],
+  options: StravaFetchOptions = {}
+): Promise<StravaDetailSyncResult> {
+  const detailLimit = positiveInteger(Number(getOptionalEnv("STRAVA_DETAIL_SYNC_LIMIT", "30")), 30);
   const existingById = new Map(existingActivities.map((activity) => [activity.providerActivityId, activity]));
   const runsNeedingDetails = activities
     .filter((activity) => activity.sportType.toLowerCase().includes("run"))
@@ -178,29 +221,42 @@ export async function fetchDetailedRunActivities(
     .slice(0, detailLimit);
 
   const detailedActivities: Activity[] = [];
+  let failedCount = 0;
   for (const activity of runsNeedingDetails) {
-    const response = await fetch(
-      `https://www.strava.com/api/v3/activities/${activity.providerActivityId}?include_all_efforts=false`,
-      {
-        headers: { authorization: `Bearer ${accessToken}` },
-        cache: "no-store"
-      }
-    );
+    try {
+      const response = await stravaFetch(
+        "activity detail fetch",
+        `https://www.strava.com/api/v3/activities/${activity.providerActivityId}?include_all_efforts=false`,
+        {
+          headers: { authorization: `Bearer ${accessToken}` },
+          cache: "no-store"
+        },
+        options
+      );
 
-    if (!response.ok) continue;
-    detailedActivities.push(normalizeStravaActivity((await response.json()) as StravaActivity));
+      if (!response.ok) {
+        failedCount += 1;
+        continue;
+      }
+      detailedActivities.push(normalizeStravaActivity((await response.json()) as StravaActivity));
+    } catch {
+      failedCount += 1;
+    }
   }
 
   return {
     activities: detailedActivities,
+    attemptedCount: runsNeedingDetails.length,
     syncedCount: detailedActivities.length,
+    failedCount,
     remainingCount: Math.max(0, runsNeedingDetails.length - detailedActivities.length)
   };
 }
 
 export async function fetchRunActivityStreams(
   accessToken: string,
-  activities: Activity[]
+  activities: Activity[],
+  options: StravaFetchOptions = {}
 ): Promise<StravaStreamSyncResult> {
   const mode = streamSyncMode();
   if (mode === "off") {
@@ -225,7 +281,7 @@ export async function fetchRunActivityStreams(
     attemptedCount += 1;
     const attemptedAt = new Date().toISOString();
     try {
-      const streams = await fetchStravaActivityStreams(accessToken, activity.providerActivityId);
+      const streams = await fetchStravaActivityStreams(accessToken, activity.providerActivityId, undefined, options);
       const normalizedStreams = normalizeStreams(streams);
       const streamTypes = Object.keys(normalizedStreams) as StravaStreamType[];
       if (!streamTypes.length) {
@@ -304,16 +360,17 @@ export async function fetchRunActivityStreams(
 export async function fetchStravaActivityStreams(
   accessToken: string,
   providerActivityId: string,
-  keys: StravaStreamType[] = ["time", "distance", "velocity_smooth", "moving", "heartrate", "cadence", "altitude", "grade_smooth"]
+  keys: StravaStreamType[] = ["time", "distance", "velocity_smooth", "moving", "heartrate", "cadence", "altitude", "grade_smooth"],
+  options: StravaFetchOptions = {}
 ) {
   const params = new URLSearchParams({
     keys: keys.join(","),
     key_by_type: "true"
   });
-  const response = await fetch(`https://www.strava.com/api/v3/activities/${providerActivityId}/streams?${params}`, {
+  const response = await stravaFetch("stream fetch", `https://www.strava.com/api/v3/activities/${providerActivityId}/streams?${params}`, {
     headers: { authorization: `Bearer ${accessToken}` },
     cache: "no-store"
-  });
+  }, options);
 
   if (!response.ok) {
     throw new Error(`Strava activity streams fetch failed: ${response.status} ${await response.text()}`);
@@ -438,13 +495,15 @@ function normalizeBestEfforts(bestEfforts?: StravaBestEffort[]): BestEffort[] | 
 }
 
 function streamSyncMode(): StravaStreamSyncMode {
-  const mode = getOptionalEnv("STRAVA_STREAM_SYNC_MODE", "full");
+  // Normal refresh powers the Today surface, so streams are enrichment only.
+  // Default to selective to avoid turning the refresh button into a historical stream backfill.
+  const mode = getOptionalEnv("STRAVA_STREAM_SYNC_MODE", "selective");
   if (mode === "off" || mode === "selective") return mode;
   return "full";
 }
 
 function streamSyncLimit(mode: StravaStreamSyncMode) {
-  const fallback = mode === "full" ? "150" : "30";
+  const fallback = mode === "full" ? "30" : "5";
   const parsed = Number(getOptionalEnv("STRAVA_STREAM_SYNC_LIMIT", fallback));
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : Number(fallback);
 }
@@ -511,4 +570,40 @@ function normalizeUrl(value: string) {
   const withoutTrailingSlash = value.replace(/\/$/, "");
   if (withoutTrailingSlash.startsWith("http")) return withoutTrailingSlash;
   return `https://${withoutTrailingSlash}`;
+}
+
+async function stravaFetch(
+  phase: "token exchange" | "token refresh" | "activity list fetch" | "activity detail fetch" | "stream fetch",
+  input: string,
+  init: RequestInit,
+  options: StravaFetchOptions
+) {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = positiveInteger(options.timeoutMs, 12000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchImpl(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error(`Strava ${phase} timed out after ${timeoutMs}ms.`);
+    }
+    const message = error instanceof Error ? error.message : "Unknown network error.";
+    throw new Error(`Strava ${phase} failed: ${message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function positiveInteger(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
 }
