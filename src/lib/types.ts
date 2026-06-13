@@ -435,7 +435,23 @@ export type AppData = {
   runnerTensionModel?: RunnerTensionModel;
   modelRuns?: StoredModelRun[];
   stravaWebhookEvents?: StravaWebhookEvent[];
+  lastWebhookProcessorRunAt?: string;
+  lastWebhookProcessorSummary?: StravaWebhookProcessorRunSummary;
+  webhookProcessingRuns?: StravaWebhookProcessorRun[];
   lastRefreshAt?: string;
+};
+
+export type StravaWebhookProcessorRunSummary = {
+  source?: "manual" | "cron";
+  attemptedCount: number;
+  processedCount: number;
+  failedCount: number;
+  ignoredCount: number;
+  remainingPendingCount: number;
+};
+
+export type StravaWebhookProcessorRun = StravaWebhookProcessorRunSummary & {
+  runAt: string;
 };
 
 export type StravaWebhookEventStatus = "pending" | "ignored" | "processed" | "failed";

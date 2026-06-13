@@ -4,7 +4,14 @@ import {
   isStravaWebhookProcessAuthorized,
   processPendingStravaWebhookEvents
 } from "./strava-webhook-processor.ts";
-import type { Activity, AppData, StravaTokenSet, StravaWebhookEvent, StravaWebhookEventStatus } from "./types.ts";
+import type {
+  Activity,
+  AppData,
+  StravaTokenSet,
+  StravaWebhookEvent,
+  StravaWebhookEventStatus,
+  StravaWebhookProcessorRunSummary
+} from "./types.ts";
 
 test("activity sync maps owner_id to matching user by strava athlete id and saves fetched activity", async () => {
   const event = webhookEvent({ id: "event-sync", ownerId: 456, objectId: 123, eventKind: "activity_sync" });
@@ -116,9 +123,39 @@ test("processor respects processing limit", async () => {
 
   assert.equal(harness.requestedLimit, 2);
   assert.equal(summary.attemptedCount, 2);
+  assert.equal(summary.remainingPendingCount, 1);
   assert.equal(harness.events[0]?.status, "processed");
   assert.equal(harness.events[1]?.status, "processed");
   assert.equal(harness.events[2]?.status, "pending");
+});
+
+test("processor records compact run metadata after processing", async () => {
+  const harness = processorHarness({
+    events: [webhookEvent({ id: "event-1", objectId: 1 })],
+    users: {
+      "user-a": { activities: [], strava: tokens({ athleteId: 456 }) }
+    }
+  });
+
+  await processPendingStravaWebhookEvents({
+    source: "cron",
+    now: new Date("2026-06-13T12:00:00.000Z"),
+    deps: harness.deps
+  });
+
+  assert.deepEqual(harness.processorRuns, [
+    {
+      runAt: "2026-06-13T12:00:00.000Z",
+      summary: {
+        source: "cron",
+        attemptedCount: 1,
+        processedCount: 1,
+        failedCount: 0,
+        ignoredCount: 0,
+        remainingPendingCount: 0
+      }
+    }
+  ]);
 });
 
 test("processor increments attempts and records failure reason on fetch failure", async () => {
@@ -162,12 +199,14 @@ function processorHarness(input: {
     ])
   );
   const fetchedActivityIds: Array<number | string> = [];
+  const processorRuns: Array<{ runAt: string; summary: StravaWebhookProcessorRunSummary }> = [];
   let requestedLimit = 0;
 
   return {
     events,
     users,
     fetchedActivityIds,
+    processorRuns,
     get requestedLimit() {
       return requestedLimit;
     },
@@ -175,6 +214,11 @@ function processorHarness(input: {
       listPendingEvents: async (limit: number) => {
         requestedLimit = limit;
         return events.filter((event) => event.status === "pending").slice(0, limit);
+      },
+      countPendingEvents: async () => events.filter((event) => event.status === "pending").length,
+      recordProcessorRun: async (runAt: string, summary: StravaWebhookProcessorRunSummary) => {
+        processorRuns.push({ runAt, summary });
+        return { runAt, ...summary };
       },
       updateEventStatus: async (
         eventId: string,

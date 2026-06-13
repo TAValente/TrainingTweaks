@@ -1,9 +1,11 @@
 import { fetchStravaActivityById, refreshTokensIfNeeded } from "./strava.ts";
 import {
+  countPendingStravaWebhookEvents,
   disconnectStravaTokens,
   findUserIdByStravaAthleteId,
   getData,
   listPendingStravaWebhookEvents,
+  recordStravaWebhookProcessorRun,
   removeStravaActivity,
   saveActivities,
   saveStravaTokens,
@@ -16,7 +18,7 @@ export type StravaWebhookProcessingSummary = {
   failedCount: number;
   ignoredCount: number;
   attemptedCount: number;
-  remainingPendingCount?: number;
+  remainingPendingCount: number;
   events: Array<{
     eventId: string;
     eventKind: StravaWebhookEvent["eventKind"];
@@ -28,6 +30,7 @@ export type StravaWebhookProcessingSummary = {
 
 export type StravaWebhookProcessorOptions = {
   limit?: number;
+  source?: "manual" | "cron";
   now?: Date;
   fetchTimeoutMs?: number;
   deps?: Partial<StravaWebhookProcessorDependencies>;
@@ -42,6 +45,8 @@ export function isStravaWebhookProcessAuthorized(
 
 type StravaWebhookProcessorDependencies = {
   listPendingEvents: (limit: number) => Promise<StravaWebhookEvent[]>;
+  countPendingEvents: typeof countPendingStravaWebhookEvents;
+  recordProcessorRun: typeof recordStravaWebhookProcessorRun;
   updateEventStatus: typeof updateStravaWebhookEventStatus;
   findUserIdByStravaAthleteId: typeof findUserIdByStravaAthleteId;
   getData: typeof getData;
@@ -63,6 +68,8 @@ export async function processPendingStravaWebhookEvents(
   const timestamp = now.toISOString();
   const deps = {
     listPendingEvents: listPendingStravaWebhookEvents,
+    countPendingEvents: countPendingStravaWebhookEvents,
+    recordProcessorRun: recordStravaWebhookProcessorRun,
     updateEventStatus: updateStravaWebhookEventStatus,
     findUserIdByStravaAthleteId,
     getData,
@@ -80,6 +87,7 @@ export async function processPendingStravaWebhookEvents(
     failedCount: 0,
     ignoredCount: 0,
     attemptedCount: 0,
+    remainingPendingCount: 0,
     events: []
   };
 
@@ -118,6 +126,16 @@ export async function processPendingStravaWebhookEvents(
       });
     }
   }
+
+  summary.remainingPendingCount = await deps.countPendingEvents();
+  await deps.recordProcessorRun(timestamp, {
+    source: options.source,
+    attemptedCount: summary.attemptedCount,
+    processedCount: summary.processedCount,
+    failedCount: summary.failedCount,
+    ignoredCount: summary.ignoredCount,
+    remainingPendingCount: summary.remainingPendingCount
+  });
 
   return summary;
 }

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/strava/webhook/process/cron",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

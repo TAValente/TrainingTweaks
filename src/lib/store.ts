@@ -11,12 +11,15 @@ import type {
   StoredModelRun,
   StravaTokenSet,
   StravaWebhookEvent,
+  StravaWebhookProcessorRun,
+  StravaWebhookProcessorRunSummary,
   StravaWebhookEventStatus,
   TrainingContext
 } from "./types.ts";
 
 const maxStoredModelRuns = 100;
 const maxStoredStravaWebhookEvents = 500;
+const maxStoredStravaWebhookProcessorRuns = 25;
 const stravaWebhookStoreId = "__strava_webhook_events__";
 let pool: Pool | undefined;
 let schemaReady: Promise<void> | undefined;
@@ -69,7 +72,8 @@ async function readDatabaseStore(database: Pool, userId: string): Promise<AppDat
     ...data,
     activities: data?.activities ?? [],
     modelRuns: data?.modelRuns ?? [],
-    stravaWebhookEvents: data?.stravaWebhookEvents ?? []
+    stravaWebhookEvents: data?.stravaWebhookEvents ?? [],
+    webhookProcessingRuns: data?.webhookProcessingRuns ?? []
   };
 }
 
@@ -82,7 +86,8 @@ async function readFileStore(userId: string): Promise<AppData> {
       ...parsed,
       activities: parsed.activities ?? [],
       modelRuns: parsed.modelRuns ?? [],
-      stravaWebhookEvents: parsed.stravaWebhookEvents ?? []
+      stravaWebhookEvents: parsed.stravaWebhookEvents ?? [],
+      webhookProcessingRuns: parsed.webhookProcessingRuns ?? []
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -226,6 +231,11 @@ export async function listPendingStravaWebhookEvents(limit: number) {
     .slice(0, Math.max(0, Math.floor(limit)));
 }
 
+export async function countPendingStravaWebhookEvents() {
+  const data = await readStore(stravaWebhookStoreId);
+  return (data.stravaWebhookEvents ?? []).filter((event) => event.status === "pending").length;
+}
+
 export async function updateStravaWebhookEventStatus(
   eventId: string,
   status: StravaWebhookEventStatus,
@@ -260,6 +270,30 @@ export async function updateStravaWebhookEventStatus(
 export async function getStravaWebhookEventCounts() {
   const data = await readStore(stravaWebhookStoreId);
   return stravaWebhookEventCounts(data.stravaWebhookEvents ?? []);
+}
+
+export async function recordStravaWebhookProcessorRun(runAt: string, summary: StravaWebhookProcessorRunSummary) {
+  const data = await readStore(stravaWebhookStoreId);
+  const run: StravaWebhookProcessorRun = { runAt, ...summary };
+  const webhookProcessingRuns = [...(data.webhookProcessingRuns ?? []), run].slice(
+    -maxStoredStravaWebhookProcessorRuns
+  );
+  await writeStore(stravaWebhookStoreId, {
+    ...data,
+    lastWebhookProcessorRunAt: runAt,
+    lastWebhookProcessorSummary: summary,
+    webhookProcessingRuns
+  });
+  return run;
+}
+
+export async function getStravaWebhookProcessorMetadata() {
+  const data = await readStore(stravaWebhookStoreId);
+  return {
+    lastWebhookProcessorRunAt: data.lastWebhookProcessorRunAt,
+    lastWebhookProcessorSummary: data.lastWebhookProcessorSummary,
+    webhookProcessingRuns: data.webhookProcessingRuns ?? []
+  };
 }
 
 export async function findUserIdByStravaAthleteId(athleteId: number): Promise<string | undefined> {
