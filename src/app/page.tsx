@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type MouseEvent, useEffect, useMemo, useState } from "react";
 import { generateTrainingPlan } from "@/lib/plan-generator";
 import {
   acceptPreviewPlan,
@@ -233,6 +233,29 @@ export default function Home() {
     } finally {
       setIsRefreshing(false);
     }
+  }
+
+  async function checkToday() {
+    const response = await fetch("/api/strava/check-today", { method: "POST" });
+    const payload = await parseJsonResponse(response);
+    if (!response.ok) throw new Error(payload.status ?? payload.error ?? "Couldn't reach Strava. Plan unchanged.");
+
+    setState((current) => ({
+      ...current,
+      connected: payload.connected ?? current.connected,
+      lastRefreshAt: payload.lastRefreshAt ?? current.lastRefreshAt,
+      activities: payload.activities ?? current.activities,
+      context: payload.context ?? current.context,
+      summary: payload.summary ?? current.summary,
+      activePlanSnapshot: payload.activePlanSnapshot ?? current.activePlanSnapshot,
+      riskFindings: payload.riskFindings ?? current.riskFindings
+    }));
+    if (payload.summary) {
+      const currentMileageEstimate = estimateCurrentMilesPerWeek(payload.summary);
+      setStarterTargetMileage((current) => Math.max(current, currentMileageEstimate));
+    }
+    setStatus(payload.status ?? "Today checked.");
+    return payload.status ?? "Today checked.";
   }
 
   async function saveDurableContext(kind: "plan" | "goals") {
@@ -531,7 +554,7 @@ export default function Home() {
         {error ? <section className="errorLine">{error}</section> : null}
 
         {activeTab === "today" ? (
-          <TodayDecisionView viewModel={todayDecision} />
+          <TodayDecisionView onCheckToday={checkToday} viewModel={todayDecision} />
         ) : (
           <PlanWorkspace
             activities={state.activities}
@@ -601,9 +624,17 @@ const todayTweakChips: Array<{ id: TweakId; label: string }> = [
   { id: "behind", label: "Behind plan" }
 ];
 
-function TodayDecisionView({ viewModel }: { viewModel: TodayDecisionViewModel }) {
+function TodayDecisionView({
+  onCheckToday,
+  viewModel
+}: {
+  onCheckToday: () => Promise<string>;
+  viewModel: TodayDecisionViewModel;
+}) {
   const [isWhyOpen, setIsWhyOpen] = useState(false);
+  const [isCheckingToday, setIsCheckingToday] = useState(false);
   const [selectedTweak, setSelectedTweak] = useState<TweakId | "">("");
+  const [todayRefreshStatus, setTodayRefreshStatus] = useState("");
   const heroVariant = viewModel.receipt.items.some((item) => item.tone === "risk")
     ? "strava-error"
     : viewModel.receipt.items.some((item) => item.tone === "caution")
@@ -616,6 +647,24 @@ function TodayDecisionView({ viewModel }: { viewModel: TodayDecisionViewModel })
   ]
     .filter(Boolean)
     .join(" / ");
+  const refreshLine = isCheckingToday
+    ? "Checking Strava..."
+    : todayRefreshStatus || "Swipe or tap for latest sync";
+
+  async function handleTodayRefresh(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (isCheckingToday) return;
+    setIsCheckingToday(true);
+    setTodayRefreshStatus("Checking Strava...");
+    try {
+      const nextStatus = await onCheckToday();
+      setTodayRefreshStatus(nextStatus);
+    } catch {
+      setTodayRefreshStatus("Couldn't reach Strava. Plan unchanged.");
+    } finally {
+      setIsCheckingToday(false);
+    }
+  }
 
   return (
     <section className="todayMockShell todayLiveShell" aria-label="TrainingTweaks Today">
@@ -655,10 +704,16 @@ function TodayDecisionView({ viewModel }: { viewModel: TodayDecisionViewModel })
             <span>{viewModel.rationale[0] ?? "Current context is incomplete."}</span>
           </div>
           <div className="todayMockEvidence">{evidence}</div>
-          <div className="todayMockSwipe" aria-label="Refresh affordance">
+          <button
+            aria-label="Check Today with Strava"
+            className="todayMockSwipe todayMockSwipeButton"
+            disabled={isCheckingToday}
+            onClick={handleTodayRefresh}
+            type="button"
+          >
             <i aria-hidden="true" />
-            <span>Refresh stays on the existing Strava path</span>
-          </div>
+            <span>{refreshLine}</span>
+          </button>
         </article>
 
         {isWhyOpen ? (
