@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authCookieName, getAuthSecret, getSessionUserFromCookie } from "@/lib/auth";
-
-const publicPaths = new Set([
-  "/login",
-  "/api/auth/login",
-  "/api/auth/logout",
-  "/favicon.ico"
-]);
+import { isPublicPath } from "@/lib/public-paths";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname, process.env)) {
     return NextResponse.next();
   }
 
@@ -32,15 +26,6 @@ export async function proxy(request: NextRequest) {
   loginUrl.pathname = "/login";
   loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
   return NextResponse.redirect(loginUrl);
-}
-
-function isPublicPath(pathname: string) {
-  return (
-    publicPaths.has(pathname) ||
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/images/") ||
-    pathname.startsWith("/assets/")
-  );
 }
 
 export const config = {
