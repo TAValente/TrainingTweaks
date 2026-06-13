@@ -434,7 +434,32 @@ export type AppData = {
   context?: TrainingContext;
   runnerTensionModel?: RunnerTensionModel;
   modelRuns?: StoredModelRun[];
+  stravaWebhookEvents?: StravaWebhookEvent[];
   lastRefreshAt?: string;
+};
+
+export type StravaWebhookEventStatus = "pending" | "ignored" | "processed" | "failed";
+
+export type StravaWebhookEventKind =
+  | "activity_sync"
+  | "activity_delete"
+  | "athlete_deauthorization"
+  | "unknown";
+
+export type StravaWebhookEvent = {
+  id: string;
+  provider: "strava";
+  objectType: string;
+  objectId: number;
+  aspectType: string;
+  ownerId: number;
+  subscriptionId: number;
+  eventTime: number;
+  updates: Record<string, unknown>;
+  receivedAt: string;
+  status: StravaWebhookEventStatus;
+  attempts: number;
+  eventKind: StravaWebhookEventKind;
 };
 
 export type RunnerTensionId =

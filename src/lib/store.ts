@@ -3,9 +3,20 @@ import { dirname, join } from "node:path";
 import { Pool } from "pg";
 import { getDatabasePoolConfig } from "./database";
 import { redactModelRun } from "./model-runs";
-import type { AppData, Activity, ModelRunFeedback, StoredModelRun, StravaTokenSet, TrainingContext } from "./types";
+import { stravaWebhookEventCounts, upsertStravaWebhookEvent } from "./strava-webhook.ts";
+import type {
+  AppData,
+  Activity,
+  ModelRunFeedback,
+  StoredModelRun,
+  StravaTokenSet,
+  StravaWebhookEvent,
+  TrainingContext
+} from "./types";
 
 const maxStoredModelRuns = 100;
+const maxStoredStravaWebhookEvents = 500;
+const stravaWebhookStoreId = "__strava_webhook_events__";
 let pool: Pool | undefined;
 let schemaReady: Promise<void> | undefined;
 
@@ -56,7 +67,8 @@ async function readDatabaseStore(database: Pool, userId: string): Promise<AppDat
     ...emptyData(),
     ...data,
     activities: data?.activities ?? [],
-    modelRuns: data?.modelRuns ?? []
+    modelRuns: data?.modelRuns ?? [],
+    stravaWebhookEvents: data?.stravaWebhookEvents ?? []
   };
 }
 
@@ -68,7 +80,8 @@ async function readFileStore(userId: string): Promise<AppData> {
       ...emptyData(),
       ...parsed,
       activities: parsed.activities ?? [],
-      modelRuns: parsed.modelRuns ?? []
+      modelRuns: parsed.modelRuns ?? [],
+      stravaWebhookEvents: parsed.stravaWebhookEvents ?? []
     };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
@@ -173,6 +186,22 @@ export async function updateModelRunFeedback(userId: string, modelRunId: string,
   }
 
   return verifiedRun;
+}
+
+export async function appendStravaWebhookEvent(event: StravaWebhookEvent) {
+  const data = await readStore(stravaWebhookStoreId);
+  const events = upsertStravaWebhookEvent(data.stravaWebhookEvents ?? [], event).slice(-maxStoredStravaWebhookEvents);
+  await writeStore(stravaWebhookStoreId, { ...data, stravaWebhookEvents: events });
+  return {
+    event,
+    counts: stravaWebhookEventCounts(events),
+    duplicate: events.every((candidate) => candidate.id !== event.id)
+  };
+}
+
+export async function getStravaWebhookEventCounts() {
+  const data = await readStore(stravaWebhookStoreId);
+  return stravaWebhookEventCounts(data.stravaWebhookEvents ?? []);
 }
 
 function appStateIdForUser(userId: string) {
