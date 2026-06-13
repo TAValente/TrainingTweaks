@@ -213,7 +213,7 @@ export async function fetchDetailedRunActivities(
   existingActivities: Activity[],
   options: StravaFetchOptions = {}
 ): Promise<StravaDetailSyncResult> {
-  const detailLimit = positiveInteger(Number(getOptionalEnv("STRAVA_DETAIL_SYNC_LIMIT", "30")), 30);
+  const detailLimit = positiveInteger(Number(getOptionalEnv("STRAVA_DETAIL_SYNC_LIMIT", "10")), 10);
   const existingById = new Map(existingActivities.map((activity) => [activity.providerActivityId, activity]));
   const runsNeedingDetails = activities
     .filter((activity) => activity.sportType.toLowerCase().includes("run"))

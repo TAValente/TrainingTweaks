@@ -92,6 +92,38 @@ test("detail failure returns partial success summary", async () => {
   assert.equal(result.remainingCount, 1);
 });
 
+test("detail sync defaults to 10 attempts unless overridden", async () => {
+  const originalLimit = process.env.STRAVA_DETAIL_SYNC_LIMIT;
+  delete process.env.STRAVA_DETAIL_SYNC_LIMIT;
+  let defaultAttempts = 0;
+  const defaultResult = await fetchDetailedRunActivities("token", runs(12), [], {
+    fetchImpl: async (input) => {
+      defaultAttempts += 1;
+      return jsonResponse(detailActivityFromUrl(input));
+    }
+  });
+
+  process.env.STRAVA_DETAIL_SYNC_LIMIT = "3";
+  let overrideAttempts = 0;
+  const overrideResult = await fetchDetailedRunActivities("token", runs(12), [], {
+    fetchImpl: async (input) => {
+      overrideAttempts += 1;
+      return jsonResponse(detailActivityFromUrl(input));
+    }
+  });
+
+  if (originalLimit === undefined) {
+    delete process.env.STRAVA_DETAIL_SYNC_LIMIT;
+  } else {
+    process.env.STRAVA_DETAIL_SYNC_LIMIT = originalLimit;
+  }
+
+  assert.equal(defaultAttempts, 10);
+  assert.equal(defaultResult.attemptedCount, 10);
+  assert.equal(overrideAttempts, 3);
+  assert.equal(overrideResult.attemptedCount, 3);
+});
+
 test("stream failure returns partial success summary", async () => {
   const fetchImpl: typeof fetch = async () => {
     throw new Error("streams unavailable");
@@ -132,5 +164,29 @@ function run(id: string, name: string): Activity {
     name,
     distanceMeters: 1609.344,
     movingTimeSeconds: 600
+  };
+}
+
+function runs(count: number) {
+  return Array.from({ length: count }, (_, index) => run(String(index + 1), `Run ${index + 1}`));
+}
+
+function detailActivityFromUrl(input: string | URL | Request) {
+  const match = String(input).match(/activities\/([^?]+)/);
+  const id = Number(match?.[1] ?? 1);
+  return {
+    id,
+    name: `Run ${id}`,
+    start_date: "2026-06-13T12:00:00Z",
+    sport_type: "Run",
+    distance: 1609.344,
+    moving_time: 600,
+    best_efforts: [
+      {
+        name: "1 mile",
+        distance: 1609.344,
+        moving_time: 600
+      }
+    ]
   };
 }
