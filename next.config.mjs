@@ -27,6 +27,8 @@ function loadLocalEnvFile(fileName) {
 loadLocalEnvFile("local.env");
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  devIndicators: false
+};
 
 export default nextConfig;

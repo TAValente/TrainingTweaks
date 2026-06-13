@@ -1421,7 +1421,7 @@ input:disabled {
 
 .auditScenarioList {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .auditScenario {
@@ -1541,6 +1541,790 @@ input:disabled {
   overflow: auto;
   padding: 14px;
   white-space: pre-wrap;
+}
+
+.todayMockShell {
+  align-items: start;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 239, 0.78), rgba(240, 232, 212, 0.56)),
+    url("/assets/product-mockups/today-forest-trail.png") center / cover fixed;
+  color: #143523;
+  display: grid;
+  gap: 22px;
+  justify-items: center;
+  min-height: 100svh;
+  overflow-x: hidden;
+  padding: 22px 16px 36px;
+  position: relative;
+}
+
+.todayMockShell::before {
+  background:
+    radial-gradient(circle at 50% 5%, rgba(255, 252, 242, 0.96), rgba(255, 252, 242, 0.36) 38%, transparent 62%),
+    linear-gradient(90deg, rgba(7, 23, 16, 0.34), transparent 24%, transparent 76%, rgba(7, 23, 16, 0.28));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.todayMockDevPanel,
+.todayMockPhone {
+  position: relative;
+  z-index: 1;
+}
+
+.todayMockDevPanel {
+  align-items: center;
+  background: rgba(255, 252, 244, 0.88);
+  border: 1px solid rgba(48, 64, 43, 0.13);
+  border-radius: 22px;
+  box-shadow: 0 18px 44px rgba(22, 32, 24, 0.16);
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+  padding: 14px;
+  width: min(100%, 520px);
+}
+
+.todayMockDevPanel p,
+.todayMockDevPanel h1 {
+  margin: 0;
+}
+
+.todayMockDevPanel p {
+  color: rgba(20, 53, 35, 0.58);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.todayMockDevPanel h1 {
+  color: #143523;
+  font-size: 1rem;
+}
+
+.todayMockScenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.todayMockScenarios button {
+  background: #f7efe0;
+  border: 1px solid rgba(48, 64, 43, 0.16);
+  border-radius: 999px;
+  color: rgba(20, 53, 35, 0.72);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 820;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.todayMockScenarios button.active {
+  background: #1f5b37;
+  border-color: #1f5b37;
+  box-shadow: 0 10px 22px rgba(31, 91, 55, 0.24);
+  color: #fffaf0;
+}
+
+.todayMockPhone {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 244, 0.94), rgba(255, 249, 237, 0.92)),
+    rgba(255, 250, 239, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 38px;
+  box-shadow:
+    0 28px 70px rgba(8, 20, 13, 0.34),
+    inset 0 0 0 1px rgba(48, 64, 43, 0.08);
+  display: grid;
+  gap: 12px;
+  max-width: 430px;
+  min-height: 812px;
+  overflow: hidden;
+  padding: 22px 24px 18px;
+  width: min(100%, 430px);
+}
+
+.todayMockHeader {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+
+.todayMockHeader p {
+  color: #1f5b37;
+  font-size: 0.78rem;
+  font-weight: 860;
+  letter-spacing: 0.14em;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+}
+
+.todayMockHeader strong {
+  color: #143523;
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.86rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 0.95;
+}
+
+.todayMockHeader span {
+  background: rgba(225, 232, 205, 0.82);
+  border: 1px solid rgba(45, 95, 52, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(20, 53, 35, 0.08);
+  color: #235c35;
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 10px 12px;
+}
+
+.todayMockHero,
+.todayMockWhySheet,
+.todayMockTweakCard,
+.todayMockWeek,
+.todayMockBottomNav {
+  background: rgba(255, 251, 241, 0.9);
+  border: 1px solid rgba(73, 67, 49, 0.14);
+  box-shadow: 0 10px 26px rgba(29, 32, 22, 0.08);
+}
+
+.todayMockHero {
+  border-radius: 28px;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  height: 398px;
+  overflow: hidden;
+  padding: 21px 25px 16px;
+  position: relative;
+}
+
+.todayMockHero:focus-visible {
+  outline: 3px solid rgba(43, 108, 61, 0.28);
+  outline-offset: 3px;
+}
+
+.todayMockHero::after {
+  background:
+    linear-gradient(90deg, rgba(255, 251, 241, 0.98) 0%, rgba(255, 251, 241, 0.92) 44%, rgba(255, 251, 241, 0.36) 74%, rgba(255, 251, 241, 0.08) 100%),
+    linear-gradient(180deg, rgba(255, 251, 241, 0.24), rgba(255, 251, 241, 0.86));
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.todayMockHeroImage {
+  background: url("/assets/product-mockups/today-forest-trail.png") center right / cover;
+  filter: saturate(0.94);
+  inset: 0 0 0 28%;
+  opacity: 0.76;
+  position: absolute;
+}
+
+.todayMockHero > *:not(.todayMockHeroImage) {
+  position: relative;
+  z-index: 1;
+}
+
+.todayMockTapHint {
+  align-items: center;
+  background: rgba(255, 252, 244, 0.68);
+  border: 1px solid rgba(73, 67, 49, 0.12);
+  border-radius: 999px;
+  color: rgba(33, 38, 30, 0.58);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 780;
+  gap: 7px;
+  justify-self: end;
+  padding: 7px 9px 7px 11px;
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  z-index: 2;
+}
+
+.todayMockTapHint::after {
+  border: solid currentColor;
+  border-width: 1.5px 1.5px 0 0;
+  content: "";
+  height: 6px;
+  transform: rotate(45deg);
+  width: 6px;
+}
+
+.todayMockRouteIcon {
+  background: rgba(224, 233, 205, 0.86);
+  border-radius: 999px;
+  height: 44px;
+  position: relative;
+  width: 44px;
+}
+
+.todayMockRouteIcon span {
+  background: #143523;
+  border-radius: 999px;
+  height: 7px;
+  position: absolute;
+  width: 7px;
+}
+
+.todayMockRouteIcon span:first-child {
+  left: 12px;
+  position: absolute;
+  top: 27px;
+}
+
+.todayMockRouteIcon span:last-child {
+  left: 28px;
+  top: 11px;
+}
+
+.todayMockRouteIcon i {
+  border: 2px solid #143523;
+  border-bottom: 0;
+  border-right: 0;
+  border-radius: 14px 0 0 0;
+  height: 18px;
+  left: 15px;
+  position: absolute;
+  top: 15px;
+  transform: rotate(14deg);
+  width: 18px;
+}
+
+.todayMockHero > p:first-of-type {
+  color: #235c35;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin: 6px 0 0;
+  text-transform: none;
+}
+
+.todayMockHero h2 {
+  color: #113520;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 3.18rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 0.92;
+  margin: 4px 0 0;
+  max-width: 350px;
+}
+
+.todayMockHero.pain h2,
+.todayMockHero.schedule h2,
+.todayMockHero.great h2,
+.todayMockHero.checking h2,
+.todayMockHero.refreshed h2,
+.todayMockHero.no-run h2,
+.todayMockHero.strava-error h2 {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 2.28rem;
+  font-weight: 860;
+  letter-spacing: 0;
+  line-height: 0.98;
+  max-width: 310px;
+}
+
+.todayMockHero.schedule h2,
+.todayMockHero.refreshed h2,
+.todayMockHero.no-run h2,
+.todayMockHero.strava-error h2 {
+  font-size: 2.16rem;
+}
+
+.todayMockHero.checking h2 {
+  font-size: 2.08rem;
+}
+
+.todayMockHeroCopy {
+  color: rgba(33, 38, 30, 0.82);
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.32;
+  margin: 0;
+  max-width: 315px;
+}
+
+.todayMockReceipt {
+  background: rgba(255, 252, 244, 0.72);
+  border: 1px solid rgba(73, 67, 49, 0.12);
+  border-left: 3px solid rgba(43, 108, 61, 0.78);
+  border-radius: 16px;
+  display: grid;
+  gap: 2px;
+  max-width: 335px;
+  padding: 8px 11px 8px 10px;
+}
+
+.todayMockReceipt strong {
+  color: #143523;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.todayMockReceipt span {
+  color: rgba(33, 38, 30, 0.68);
+  font-size: 0.72rem;
+  font-weight: 690;
+  line-height: 1.32;
+}
+
+.todayMockEvidence {
+  border-top: 1px solid rgba(73, 67, 49, 0.15);
+  color: rgba(29, 36, 28, 0.72);
+  font-size: 0.74rem;
+  font-weight: 760;
+  line-height: 1.35;
+  margin-top: 3px;
+  padding-top: 8px;
+}
+
+.todayMockHero.no-run .todayMockReceipt,
+.todayMockHero.strava-error .todayMockReceipt {
+  border-left-color: rgba(120, 105, 75, 0.72);
+}
+
+.todayMockSwipe {
+  align-items: center;
+  color: rgba(29, 36, 28, 0.66);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 760;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.todayMockSwipe i {
+  border: 1px solid rgba(45, 95, 52, 0.22);
+  border-radius: 999px;
+  display: block;
+  height: 26px;
+  position: relative;
+  width: 26px;
+}
+
+.todayMockSwipe i::before {
+  border: solid #235c35;
+  border-width: 2px 2px 0 0;
+  content: "";
+  height: 8px;
+  left: 8px;
+  position: absolute;
+  top: 9px;
+  transform: rotate(-45deg);
+  width: 8px;
+}
+
+.todayMockWhySheet {
+  border-radius: 22px;
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.todayMockWhySheet header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.todayMockWhySheet h3,
+.todayMockWhySheet p {
+  margin: 0;
+}
+
+.todayMockWhySheet h3 {
+  color: #143523;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.todayMockWhySheet p {
+  color: rgba(33, 38, 30, 0.56);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.todayMockWhySheet button {
+  background: rgba(255, 252, 244, 0.66);
+  border: 1px solid rgba(73, 67, 49, 0.12);
+  border-radius: 999px;
+  color: rgba(33, 38, 30, 0.64);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 820;
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.todayMockWhyList {
+  display: grid;
+  gap: 7px;
+}
+
+.todayMockWhyList div {
+  align-items: baseline;
+  border-top: 1px solid rgba(73, 67, 49, 0.1);
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 116px minmax(0, 1fr);
+  padding-top: 7px;
+}
+
+.todayMockWhyList div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.todayMockWhyList strong {
+  color: #143523;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.todayMockWhyList span {
+  color: rgba(33, 38, 30, 0.66);
+  font-size: 0.76rem;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.todayMockWeek {
+  border-radius: 24px;
+  cursor: pointer;
+  display: grid;
+  gap: 13px;
+  padding: 15px 16px 16px;
+  position: relative;
+}
+
+.todayMockWeek::after {
+  border: solid rgba(33, 38, 30, 0.48);
+  border-width: 1.5px 1.5px 0 0;
+  content: "";
+  height: 8px;
+  position: absolute;
+  right: 17px;
+  top: 18px;
+  transform: rotate(45deg);
+  width: 8px;
+}
+
+.todayMockTweakCard {
+  background: rgba(255, 252, 244, 0.72);
+  border-color: rgba(73, 67, 49, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 6px 18px rgba(29, 32, 22, 0.055);
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.todayMockSectionHeader {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.todayMockSectionHeader h3,
+.todayMockSectionHeader p {
+  margin: 0;
+}
+
+.todayMockSectionHeader h3 {
+  color: #143523;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
+.todayMockSectionHeader p {
+  color: rgba(33, 38, 30, 0.58);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.todayMockWeekPath {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding-top: 4px;
+  position: relative;
+}
+
+.todayMockWeekPath::before {
+  background:
+    linear-gradient(90deg, rgba(43, 108, 61, 0.92), rgba(120, 149, 93, 0.76), rgba(190, 133, 67, 0.82));
+  border-radius: 999px;
+  content: "";
+  height: 3px;
+  left: 14%;
+  opacity: 0.82;
+  position: absolute;
+  right: 14%;
+  top: 21px;
+}
+
+.todayMockWeekPath div {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  min-width: 0;
+  position: relative;
+}
+
+.todayMockWeekPath span {
+  background: #fffaf0;
+  border: 2px solid #2b6c3d;
+  border-radius: 999px;
+  box-shadow: 0 6px 14px rgba(20, 53, 35, 0.12);
+  height: 36px;
+  width: 36px;
+}
+
+.todayMockWeekPath .active span {
+  background: #2b6c3d;
+  box-shadow: 0 7px 16px rgba(43, 108, 61, 0.2);
+}
+
+.todayMockWeekPath .active span::before {
+  background: #fffaf0;
+  border-radius: 999px;
+  content: "";
+  display: block;
+  height: 9px;
+  margin: 11px auto 0;
+  width: 9px;
+}
+
+.todayMockWeekPath .rest span {
+  border-color: #a3a97c;
+}
+
+.todayMockWeekPath .long span {
+  border-color: #be8543;
+}
+
+.todayMockWeekPath small {
+  background: rgba(224, 225, 202, 0.72);
+  border-radius: 999px;
+  color: rgba(33, 38, 30, 0.58);
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.todayMockWeekPath strong {
+  color: #182d20;
+  font-size: 0.98rem;
+}
+
+.todayMockChips {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.todayMockChips button {
+  background: rgba(255, 252, 244, 0.58);
+  border: 1px solid rgba(73, 67, 49, 0.12);
+  border-radius: 999px;
+  color: rgba(33, 38, 30, 0.78);
+  cursor: pointer;
+  font-size: 0.73rem;
+  font-weight: 820;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.todayMockChips button.active {
+  background: #edf4df;
+  border-color: #2b6c3d;
+  box-shadow: inset 0 0 0 1px rgba(43, 108, 61, 0.22), 0 8px 18px rgba(43, 108, 61, 0.12);
+  color: #235c35;
+}
+
+.todayMockChips button:nth-child(4).active {
+  background: #fff0dd;
+  border-color: #b66b2a;
+  box-shadow: inset 0 0 0 1px rgba(182, 107, 42, 0.18), 0 8px 18px rgba(182, 107, 42, 0.1);
+  color: #a25118;
+}
+
+.todayMockBottomNav {
+  border-radius: 28px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: auto;
+  padding: 8px;
+}
+
+.todayMockBottomNav a {
+  border-radius: 22px;
+  color: rgba(33, 38, 30, 0.64);
+  font-size: 0.82rem;
+  font-weight: 820;
+  min-height: 50px;
+  padding: 17px 6px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.todayMockBottomNav a.active {
+  background: rgba(224, 233, 205, 0.9);
+  color: #235c35;
+  box-shadow: inset 0 0 0 1px rgba(45, 95, 52, 0.08);
+}
+
+@media (min-width: 900px) {
+  .todayMockShell {
+    align-items: start;
+    grid-template-columns: 250px minmax(0, 430px);
+    justify-content: center;
+    padding: 40px 28px;
+  }
+
+  .todayMockDevPanel {
+    position: sticky;
+    top: 40px;
+  }
+}
+
+@media (max-width: 520px) {
+  .todayMockShell {
+    background:
+      linear-gradient(180deg, rgba(255, 250, 239, 0.92), rgba(255, 250, 239, 0.86)),
+      url("/assets/product-mockups/today-forest-trail.png") center / cover;
+    display: block;
+    padding: 0;
+  }
+
+  .todayMockDevPanel {
+    border-radius: 0;
+    box-shadow: none;
+    max-width: none;
+    padding: 10px 12px;
+    width: 100%;
+  }
+
+  .todayMockDevPanel h1 {
+    display: none;
+  }
+
+  .todayMockScenarios {
+    overflow-x: auto;
+    padding-bottom: 2px;
+    flex-wrap: nowrap;
+  }
+
+  .todayMockScenarios button {
+    flex: 0 0 auto;
+  }
+
+  .todayMockPhone {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: none;
+    min-height: 100svh;
+    padding: 18px 18px 18px;
+    width: 100%;
+  }
+
+  .todayMockHero,
+  .todayMockWeek,
+  .todayMockTweakCard,
+  .todayMockBottomNav {
+    justify-self: center;
+    width: min(100%, calc(100vw - 36px));
+  }
+
+  .todayMockHeader,
+  .todayMockSectionHeader {
+    align-items: start;
+    display: grid;
+    justify-content: start;
+  }
+
+  .todayMockHeader {
+    gap: 8px;
+  }
+
+  .todayMockHeader strong {
+    font-size: 1.86rem;
+  }
+
+  .todayMockHeader span {
+    font-size: 0.74rem;
+    justify-self: start;
+    padding: 9px 10px;
+  }
+
+  .todayMockSectionHeader p {
+    text-align: left;
+  }
+}
+
+@media (max-width: 390px) {
+  .todayMockPhone {
+    gap: 14px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .todayMockHero {
+    height: 390px;
+    padding: 22px 22px 18px;
+  }
+
+  .todayMockHero h2 {
+    font-size: 2.92rem;
+  }
+
+  .todayMockHero.pain h2,
+  .todayMockHero.schedule h2,
+  .todayMockHero.great h2,
+  .todayMockHero.checking h2,
+  .todayMockHero.refreshed h2,
+  .todayMockHero.no-run h2,
+  .todayMockHero.strava-error h2 {
+    font-size: 2.02rem;
+  }
+
+  .todayMockHeroCopy {
+    font-size: 0.92rem;
+  }
+
+  .todayMockReceipt {
+    padding: 9px 10px;
+  }
+
+  .todayMockWhyList div {
+    grid-template-columns: 1fr;
+  }
+
+  .todayMockChips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
 }
 
 @media (max-width: 980px) {
