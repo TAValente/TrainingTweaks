@@ -1,5 +1,5 @@
 import type { PoolConfig } from "pg";
-import { getOptionalEnv } from "./env";
+import { getOptionalEnv } from "./env.ts";
 
 export type DatabasePublicConfig = {
   source: "parts" | "url" | "none";

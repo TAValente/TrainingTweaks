@@ -1,8 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Pool } from "pg";
-import { getDatabasePoolConfig } from "./database";
-import { redactModelRun } from "./model-runs";
+import { getDatabasePoolConfig } from "./database.ts";
+import { redactModelRun } from "./model-runs.ts";
 import { stravaWebhookEventCounts, upsertStravaWebhookEvent } from "./strava-webhook.ts";
 import type {
   AppData,
@@ -11,8 +11,9 @@ import type {
   StoredModelRun,
   StravaTokenSet,
   StravaWebhookEvent,
+  StravaWebhookEventStatus,
   TrainingContext
-} from "./types";
+} from "./types.ts";
 
 const maxStoredModelRuns = 100;
 const maxStoredStravaWebhookEvents = 500;
@@ -128,6 +129,12 @@ export async function saveStravaTokens(userId: string, tokens: StravaTokenSet) {
   await writeStore(userId, { ...data, strava: tokens });
 }
 
+export async function disconnectStravaTokens(userId: string) {
+  const data = await readStore(userId);
+  const { strava: _strava, ...nextData } = data;
+  await writeStore(userId, nextData);
+}
+
 export async function saveActivities(userId: string, activities: Activity[]) {
   const data = await readStore(userId);
   const merged = new Map<string, Activity>();
@@ -150,6 +157,19 @@ export async function saveActivities(userId: string, activities: Activity[]) {
     lastRefreshAt: new Date().toISOString()
   });
   return sorted;
+}
+
+export async function removeStravaActivity(userId: string, providerActivityId: string) {
+  const data = await readStore(userId);
+  const activities = data.activities.filter(
+    (activity) => activity.provider !== "strava" || activity.providerActivityId !== providerActivityId
+  );
+  await writeStore(userId, {
+    ...data,
+    activities,
+    lastRefreshAt: new Date().toISOString()
+  });
+  return activities;
 }
 
 export async function saveContext(userId: string, context: TrainingContext) {
@@ -199,17 +219,105 @@ export async function appendStravaWebhookEvent(event: StravaWebhookEvent) {
   };
 }
 
+export async function listPendingStravaWebhookEvents(limit: number) {
+  const data = await readStore(stravaWebhookStoreId);
+  return (data.stravaWebhookEvents ?? [])
+    .filter((event) => event.status === "pending")
+    .slice(0, Math.max(0, Math.floor(limit)));
+}
+
+export async function updateStravaWebhookEventStatus(
+  eventId: string,
+  status: StravaWebhookEventStatus,
+  metadata: Partial<Pick<
+    StravaWebhookEvent,
+    | "processedAt"
+    | "failedAt"
+    | "ignoredAt"
+    | "failureReason"
+    | "ignoredReason"
+    | "matchedUserId"
+    | "lastAttemptAt"
+    | "attempts"
+  >> = {}
+) {
+  const data = await readStore(stravaWebhookStoreId);
+  let updated: StravaWebhookEvent | undefined;
+  const events = (data.stravaWebhookEvents ?? []).map((event) => {
+    if (event.id !== eventId) return event;
+    updated = {
+      ...event,
+      status,
+      ...metadata
+    };
+    return updated;
+  });
+  if (!updated) return undefined;
+  await writeStore(stravaWebhookStoreId, { ...data, stravaWebhookEvents: events });
+  return updated;
+}
+
 export async function getStravaWebhookEventCounts() {
   const data = await readStore(stravaWebhookStoreId);
   return stravaWebhookEventCounts(data.stravaWebhookEvents ?? []);
+}
+
+export async function findUserIdByStravaAthleteId(athleteId: number): Promise<string | undefined> {
+  const database = getPool();
+  if (database) return findDatabaseUserIdByStravaAthleteId(database, athleteId);
+  return findFileUserIdByStravaAthleteId(athleteId);
+}
+
+async function findDatabaseUserIdByStravaAthleteId(database: Pool, athleteId: number) {
+  await ensureSchema();
+  const result = await database.query<{ id: string }>(
+    `
+      select id
+      from trainingtweaks_app_state
+      where id like 'user:%'
+        and (data #>> '{strava,athleteId}') = $1
+      order by updated_at desc
+      limit 1
+    `,
+    [String(athleteId)]
+  );
+  return userIdFromAppStateId(result.rows[0]?.id);
+}
+
+async function findFileUserIdByStravaAthleteId(athleteId: number) {
+  let entries: Array<{ isDirectory(): boolean; name: string }>;
+  try {
+    entries = await readdir(usersStoreDirectory(), { withFileTypes: true });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return undefined;
+    throw error;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const userId = decodeURIComponent(entry.name);
+    if (userId === stravaWebhookStoreId) continue;
+    const data = await readFileStore(userId);
+    if (data.strava?.athleteId === athleteId) return userId;
+  }
+  return undefined;
 }
 
 function appStateIdForUser(userId: string) {
   return `user:${userId}`;
 }
 
+function userIdFromAppStateId(id: string | undefined) {
+  return id?.startsWith("user:") ? id.slice("user:".length) : undefined;
+}
+
+function usersStoreDirectory() {
+  return join(process.cwd(), ".data", "users");
+}
+
 function storePathForUser(userId: string) {
-  return join(process.cwd(), ".data", "users", encodeURIComponent(userId), "trainingtweaks.json");
+  return join(usersStoreDirectory(), encodeURIComponent(userId), "trainingtweaks.json");
 }
 
 function mergeActivity(existing: Activity | undefined, next: Activity): Activity {

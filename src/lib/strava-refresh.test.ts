@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchDetailedRunActivities, fetchRecentStravaActivities, fetchRunActivityStreams } from "./strava.ts";
+import {
+  fetchDetailedRunActivities,
+  fetchRecentStravaActivities,
+  fetchRunActivityStreams,
+  fetchStravaActivityById
+} from "./strava.ts";
 import {
   stravaRefreshConfig,
   stravaRefreshWindow,
@@ -97,6 +102,20 @@ test("detail failure returns partial success summary", async () => {
   assert.equal(result.syncedCount, 0);
   assert.equal(result.failedCount, 1);
   assert.equal(result.remainingCount, 1);
+});
+
+test("single activity fetch uses the activity id endpoint and normalizes activity", async () => {
+  const requestedUrls: string[] = [];
+  const result = await fetchStravaActivityById("token", 123, {
+    fetchImpl: async (input) => {
+      requestedUrls.push(String(input));
+      return jsonResponse(detailActivityFromUrl(input));
+    }
+  });
+
+  assert.equal(requestedUrls.length, 1);
+  assert.match(requestedUrls[0] ?? "", /\/activities\/123\?include_all_efforts=false$/);
+  assert.equal(result.providerActivityId, "123");
 });
 
 test("detail sync defaults to 10 attempts unless overridden", async () => {
