@@ -3,7 +3,8 @@ import { getOptionalEnv } from "@/lib/env";
 import {
   authorizeManualStravaWebhookProcess,
   parseStravaWebhookProcessLimit,
-  stravaWebhookProcessSecretHeader
+  stravaWebhookProcessSecretHeader,
+  stravaWebhookProcessUnauthorizedError
 } from "@/lib/strava-webhook-process-route";
 import {
   processPendingStravaWebhookEvents
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
   const providedSecret = request.headers.get(stravaWebhookProcessSecretHeader);
 
   if (!authorizeManualStravaWebhookProcess({ providedSecret, expectedSecret })) {
-    return NextResponse.json({ error: "Invalid Strava webhook process secret." }, { status: 401 });
+    return NextResponse.json({ error: stravaWebhookProcessUnauthorizedError }, { status: 401 });
   }
 
   const limit = parseStravaWebhookProcessLimit(request.nextUrl.searchParams.get("limit"));
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   const providedSecret = request.headers.get(stravaWebhookProcessSecretHeader);
 
   if (!authorizeManualStravaWebhookProcess({ providedSecret, expectedSecret })) {
-    return NextResponse.json({ error: "Invalid Strava webhook process secret." }, { status: 401 });
+    return NextResponse.json({ error: stravaWebhookProcessUnauthorizedError }, { status: 401 });
   }
 
   return NextResponse.json({ ok: true, ...(await getStravaWebhookProcessorMetadata()) });

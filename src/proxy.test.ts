@@ -12,3 +12,9 @@ test("ordinary app pages remain protected by auth proxy", () => {
   assert.equal(isPublicPath("/", { NODE_ENV: "development" }), false);
   assert.equal(isPublicPath("/model-runs", { NODE_ENV: "development" }), false);
 });
+
+test("Strava webhook processor bypasses cookie auth but user routes remain protected", () => {
+  assert.equal(isPublicPath("/api/strava/webhook/process"), true);
+  assert.equal(isPublicPath("/api/strava/refresh"), false);
+  assert.equal(isPublicPath("/api/state"), false);
+});

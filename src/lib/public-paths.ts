@@ -2,6 +2,7 @@ const publicPaths = new Set([
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/strava/webhook/process",
   "/favicon.ico"
 ]);
 
