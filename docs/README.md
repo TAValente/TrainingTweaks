@@ -5,6 +5,7 @@ These documents capture the product doctrine, engineering principles, architectu
 - [Doctrine](doctrine.md): what the product is, what it is not, and how it should behave.
 - [Principles](principles.md): decision rules for product and engineering tradeoffs.
 - [Architecture](architecture.md): system layers, entities, data flow, and storage boundaries.
+- [Operations](operations.md): deployment settings and automation boundaries.
 - [Economics](economics.md): cost philosophy and rules for keeping the system efficient.
 - [Roadmap](roadmap.md): current build sequence and product priorities.
 

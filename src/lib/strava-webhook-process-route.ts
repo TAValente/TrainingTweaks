@@ -3,6 +3,7 @@ import { isStravaWebhookProcessAuthorized } from "./strava-webhook-processor.ts"
 export const stravaWebhookProcessDefaultLimit = 25;
 export const stravaWebhookProcessMaxLimit = 100;
 export const stravaWebhookProcessSecretHeader = "x-trainingtweaks-process-secret";
+export const stravaWebhookProcessUnauthorizedError = "Invalid Strava webhook process secret.";
 
 export type StravaWebhookProcessSource = "manual";
 

@@ -42,7 +42,13 @@ jobs:
             process.exit(1);
           }
 
-          const url = new URL("/api/strava/webhook/process", appUrl.replace(/\/$/, ""));
+          const appOrigin = new URL(appUrl);
+          if (appOrigin.pathname !== "/" || appOrigin.search || appOrigin.hash) {
+            console.error("TRAININGTWEAKS_APP_URL must be the deployed app origin only, for example https://example.com.");
+            process.exit(1);
+          }
+
+          const url = new URL("/api/strava/webhook/process", appOrigin.origin);
           url.searchParams.set("limit", "25");
           url.searchParams.set("x-vercel-protection-bypass", vercelBypassSecret);
 
